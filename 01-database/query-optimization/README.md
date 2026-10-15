@@ -4,7 +4,7 @@
 - **Week:** Week 1-4
 
 ## Reference
-- SQL Query Optimization: 15 Techniques for Better Performance | DataCamp
+- [SQL Query Optimization: 15 Techniques for Better Performance | DataCamp](https://www.datacamp.com/blog/sql-query-optimization)
 
 ## Key concepts
 - 
@@ -19,3 +19,6 @@
 - [ ] Read reference
 - [ ] Notes written
 - [ ] Practice done
+
+## Slide
+- Link: 

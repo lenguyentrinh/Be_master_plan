@@ -4,7 +4,7 @@
 - **Week:** Week 9-10
 
 ## Reference
-- Use of Elasticsearch: Implementation and Importance | Pickl.AI Blog
+- [Use of Elasticsearch: Implementation and Importance | Pickl.AI Blog](https://www.pickl.ai/blog/use-of-elasticsearch)
 
 ## Key concepts
 - 
@@ -19,3 +19,6 @@
 - [ ] Read reference
 - [ ] Notes written
 - [ ] Practice done
+
+## Slide
+- Link: 

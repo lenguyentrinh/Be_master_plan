@@ -19,3 +19,6 @@
 - [ ] Read reference
 - [ ] Notes written
 - [ ] Practice done
+
+## Slide
+- Link: 

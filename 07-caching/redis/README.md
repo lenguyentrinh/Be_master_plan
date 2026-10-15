@@ -4,7 +4,7 @@
 - **Week:** Week 9-10
 
 ## Reference
-- What is Caching and How it Works | AWS
+- [What is Caching and How it Works | AWS](https://aws.amazon.com/caching/)
 
 ## Key concepts
 - 
@@ -19,3 +19,6 @@
 - [ ] Read reference
 - [ ] Notes written
 - [ ] Practice done
+
+## Slide
+- Link: 

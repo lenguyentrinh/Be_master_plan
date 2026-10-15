@@ -4,7 +4,7 @@
 - **Week:** Week 5-6
 
 ## Reference
-- The 7 most important software design patterns
+- [The 7 most important software design patterns](https://www.educative.io/blog/the-7-most-important-software-design-patterns)
 
 ## Key concepts
 - 
@@ -19,3 +19,6 @@
 - [ ] Read reference
 - [ ] Notes written
 - [ ] Practice done
+
+## Slide
+- Link: 

@@ -4,7 +4,7 @@
 - **Week:** Week 1-4
 
 ## Reference
-- Concurrency Control in DBMS: Locking, MVCC & More | Databricks Blog
+- [Concurrency Control in DBMS: Locking, MVCC & More | Databricks Blog](https://www.databricks.com/blog/concurrency-control)
 
 ## Key concepts
 - 
@@ -19,3 +19,6 @@
 - [ ] Read reference
 - [ ] Notes written
 - [ ] Practice done
+
+## Slide
+- Link: 

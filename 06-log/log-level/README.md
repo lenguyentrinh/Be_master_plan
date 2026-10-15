@@ -4,7 +4,7 @@
 - **Week:** Week 8
 
 ## Reference
-- Application Logging Best Practices: A Complete Guide
+- [Application Logging Best Practices: A Complete Guide](https://www.dnsstuff.com/application-logging)
 
 ## Key concepts
 - 
@@ -19,3 +19,6 @@
 - [ ] Read reference
 - [ ] Notes written
 - [ ] Practice done
+
+## Slide
+- Link: 
