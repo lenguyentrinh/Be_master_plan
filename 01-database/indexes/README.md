@@ -9,6 +9,7 @@
 ## Key concepts
 
 ### 1. Index là gì
+- Index là một cấu trúc dữ liệu phụ, giúp tìm dòng dữ liệu nhanh hơn.
 - Index giúp database tìm dòng dữ liệu mà không phải quét toàn bộ bảng (full table scan).
 - Đánh đổi: **đọc nhanh hơn, ghi chậm hơn** (mỗi INSERT/UPDATE/DELETE phải cập nhật cả index) và tốn thêm bộ nhớ/ổ đĩa.
 - Ví dụ trong bài: B-tree index trên `customer_id` của bảng 1 triệu dòng giảm I/O khoảng 10.000 lần (số liệu minh họa của bài viết, không phải benchmark).
@@ -17,7 +18,7 @@
 
 | Loại | Dùng khi | Lưu ý |
 |---|---|---|
-| **B-tree** (mặc định) | So sánh bằng, range, sort, `LIKE 'abc%'` | Không dùng được cho `LIKE '%abc'` (wildcard đứng đầu) |
+| **B-tree** (mặc định) | So sánh bằng (`email = 'alice@example.com'`), range (`age BETWEEN 10 AND 20`), sort (`ORDER BY email LIMIT 10`), `LIKE 'abc%'` (prefix) | Không dùng được cho `LIKE '%abc'` (wildcard đứng đầu) |
 | **Unique** | Chống trùng giá trị | Primary key tự tạo unique index |
 | **Composite** (nhiều cột) | Query lọc/sắp xếp theo nhiều cột | Thứ tự cột quan trọng, theo quy tắc *leftmost prefix* |
 | **Partial / Filtered** | Chỉ cần index một phần dòng (`WHERE ...`) | PostgreSQL gọi là partial, SQL Server gọi là filtered; index nhỏ hơn |
@@ -28,19 +29,25 @@
 | **Non-clustered** | Cấu trúc riêng, trỏ về dòng dữ liệu | Có thể có nhiều index loại này |
 
 ```sql
--- B-tree (mặc định)
+-- B-tree cấu trúc index (mặc định)
 CREATE INDEX idx_orders_customer ON orders (customer_id);
+-- TH đặc biệt: nếu có nhiều key trùng nhau thì sẽ tìm kiếm ở node cha chứa key đó và sẽ tìm leaf node liền kề.
 
--- Unique
+-- Unique là quy tắc (B-tree)
 CREATE UNIQUE INDEX idx_users_email ON users (email);
+-- TH1: Nếu có sự trùng lặp ở column đó thì không thể tạo unique index cho column.
+-- TH2: Nếu ban đầu chưa có giá trị trùng nhau thì có thể tạo unique index, cùng với đó column sẽ restrict việc thêm giá trị trùng lặp.
 
--- Composite: equality trước, range sau
+-- Composite: equality trước, range sau (1 key gồm nhiều column)
 CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at);
+-- Composite index sẽ sắp xếp theo column đầu tiên trước, nếu có sự trùng lặp ở column đầu tiên thì mới dựa vào column tiếp theo để sắp xếp.
+-- Khi tìm kiếm thì nó sẽ ưu tiên column trước, sau đó mới check column sau.
+-- Composite index chỉ có tác dụng khi mình tìm kiếm bộ key hoặc tìm kiếm column đầu tiên. Nếu tìm kiếm theo column tiếp theo thì nó không có tác dụng được, bởi vì nó phải tìm kiếm tuần tự theo column, không thể bỏ qua column đầu tiên để tìm kiếm column tiếp theo.
 
--- Partial (PostgreSQL)
+-- Partial (PostgreSQL) : tạo cấu trúc phụ cho một số record thỏa mãn điều kiện nhất định, không phải tất cả các record trong bảng (MySQL không hỗ trợ where khi tạo index)
 CREATE INDEX idx_orders_pending ON orders (created_at) WHERE status = 'pending';
 
--- Covering (PostgreSQL 11+ / SQL Server)
+-- Covering (PostgreSQL 11+ / SQL Server): nó sẽ giúp việc lấy giá trị cột khác đã được cover lúc tạo covering index mà không cần refer đến bảng chính. (các cột cover không dùng để sắp xếp)
 CREATE INDEX idx_orders_cover ON orders (customer_id) INCLUDE (total, status);
 ```
 
