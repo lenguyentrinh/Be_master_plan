@@ -50,8 +50,19 @@ CREATE INDEX idx_orders_pending ON orders (created_at) WHERE status = 'pending';
 -- Full-text: tokenize nội dung văn bản, hỗ trợ tìm kiếm ngôn ngữ tự nhiên
 -- MySQL
 CREATE FULLTEXT INDEX idx_articles_content ON articles (title, body);
+-- TH1: tìm keywork nhưng từ khóa không cần liền kề
+SELECT * FROM articles WHERE MATCH(title, body) AGAINST('my name is');
+-- TH2: tìm keywork nhưng làm một cụm từ
+SELECT * FROM articles WHERE MATCH(title, body) AGAINST('"my name is"' IN BOOLEAN MODE);
+
 -- PostgreSQL
 CREATE INDEX idx_articles_search ON articles USING gin (to_tsvector('english', title || ' ' || body));
+-- TH1:  không cần liền kề
+SELECT id, title, body FROM articles WHERE to_tsvector('english', title || ' ' || body) @@ plainto_tsquery('english', 'database design');
+-- TH2: liền kề
+SELECT id, title, body FROM articles WHERE to_tsvector('english', title || ' ' || body) @@ phraseto_tsquery('english', 'database design');
+-- Biểu thức trong query phải giống hệt biểu thức lúc tạo index thì GIN mới được dùng.
+
 
 -- GIN / GiST (PostgreSQL)
 -- GIN: cho JSONB, array, full-text

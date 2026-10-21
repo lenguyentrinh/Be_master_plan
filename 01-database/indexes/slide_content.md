@@ -112,8 +112,7 @@ Deck: https://www.canva.com/design/DAHYhGFyqoI/DXfLNbB4reodOOOhBwBHPQ/edit
 - Prefer one composite index over many single-column indexes
 
 **Hình:** Chuỗi 1 equality → 2 equality → 3 first range → sau range không dùng được
-
-**Ghi chú:** Thứ tự cột quyết định index có được dùng hay không. Đặt cột so sánh bằng trước, rồi tới cột range đầu tiên; cột đứng sau điều kiện range không dùng được index. Giữa các cột equality, đặt cột có độ chọn lọc (selectivity) cao nhất trước. Nhắc lại leftmost prefix: index (a, b, c) dùng được cho a, (a, b), (a, b, c) nhưng không dùng được cho riêng b hoặc c. Thà tạo một composite index còn hơn là nhiều index đơn cột.
+**Ghi chú:** Thứ tự cột quyết định index có được dùng hay không. Đặt cột so sánh bằng trước, rồi tới cột range đầu tiên; cột đứng sau điều kiện range không dùng được index. Giữa các cột equality, đặt cột có độ chọn lọc (selectivity) cao nhất trước. Nhắc lại leftmost prefix: index (a, b, c) dùng được cho a, (a, b), (a, b, c) nhưng không dùng được cho riêng b hoặc c. Thà tạo một composite index còn hơn là nhiều index đơn cột. Vì sao equality đặt trước: các dòng cùng giá trị equality nằm liền nhau trong index nên điều kiện range cắt được một đoạn liên tục; sau cột range thì các cột kế tiếp không còn được sắp xếp trong đoạn đó nên không thu hẹp thêm được.
 
 ---
 
