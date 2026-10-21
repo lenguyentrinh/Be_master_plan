@@ -47,6 +47,18 @@ CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at);
 -- Partial (PostgreSQL) : tạo cấu trúc phụ cho một số record thỏa mãn điều kiện nhất định, không phải tất cả các record trong bảng (MySQL không hỗ trợ where khi tạo index)
 CREATE INDEX idx_orders_pending ON orders (created_at) WHERE status = 'pending';
 
+-- Full-text: tokenize nội dung văn bản, hỗ trợ tìm kiếm ngôn ngữ tự nhiên
+-- MySQL
+CREATE FULLTEXT INDEX idx_articles_content ON articles (title, body);
+-- PostgreSQL
+CREATE INDEX idx_articles_search ON articles USING gin (to_tsvector('english', title || ' ' || body));
+
+-- GIN / GiST (PostgreSQL)
+-- GIN: cho JSONB, array, full-text
+CREATE INDEX idx_products_tags ON products USING gin (tags);
+-- GiST: cho dữ liệu hình học, range, truy vấn theo khoảng cách
+CREATE INDEX idx_locations_coords ON locations USING gist (coordinates);
+
 -- Covering (PostgreSQL 11+ / SQL Server): nó sẽ giúp việc lấy giá trị cột khác đã được cover lúc tạo covering index mà không cần refer đến bảng chính. (các cột cover không dùng để sắp xếp)
 CREATE INDEX idx_orders_cover ON orders (customer_id) INCLUDE (total, status);
 ```
