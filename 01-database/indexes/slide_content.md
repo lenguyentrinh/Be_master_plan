@@ -1,19 +1,29 @@
 # Slide content: Database Indexes
 
-Nội dung từng slide (slide 1 đến 13) của deck Canva. Chữ trên slide bằng tiếng Anh, phần **Ghi chú** là speaker notes tiếng Việt.
+Nội dung từng slide của deck Canva (7 slide: 1 slide tiêu đề và agenda + 6 slide nội dung, present khoảng 15 phút). Chữ trên slide bằng tiếng Anh, phần **Ghi chú** là speaker notes tiếng Việt. Nội dung bám theo các mục trong `README.md`; hai mục Q&A và Hands-on không làm slide.
 
 Deck: https://www.canva.com/design/DAHYhGFyqoI/DXfLNbB4reodOOOhBwBHPQ/edit
 
+| Slide | Câu hỏi cần trả lời | Mục trong README |
+|---|---|---|
+| 1 | Giới thiệu chủ đề và 6 phần sẽ trình bày | Toàn bộ README |
+| 2 | Index là gì? | 1. Index là gì |
+| 3 | B-tree là gì? | 2. Các loại index (B-tree, Unique) |
+| 4 | Có mấy loại index? | 2. Các loại index |
+| 5 | Thiết kế index thế nào? | 3. Thứ tự cột, 4. Covering, 5. JOIN, 6. ORDER BY và GROUP BY |
+| 6 | Các lỗi thường gặp? | 7. Bảy lỗi thường gặp |
+| 7 | Làm sao biết index có đang hoạt động? | 8. Kiểm tra bằng EXPLAIN, 9. Bảo trì index |
+
 ---
 
-## Slide 1: Database Indexes
+## Slide 1: Indexes
 
 - Backend Master Plan - Database (Week 1-4)
-- How indexes speed up queries, and what they cost
+- 6 parts to cover in about 15 minutes
 
-**Hình:** Query → Index (B-tree) → Row found directly
+**Hình:** 6 thẻ agenda: 1 What is an Index? | 2 What is a B-tree? | 3 How many types of index? | 4 Designing indexes | 5 Common mistakes | 6 Is the index used? (EXPLAIN / EXPLAIN ANALYZE)
 
-**Ghi chú:** Chào mọi người. Hôm nay mình trình bày về Database Index: index là gì, có những loại nào, cách thiết kế và kiểm tra index. Mục tiêu là hiểu được khi nào index giúp query nhanh hơn và khi nào nó gây hại.
+**Ghi chú:** Chào mọi người. Hôm nay mình trình bày về Index trong database, khoảng 15 phút, gồm 6 phần. (1) Index là gì. (2) B-tree là gì. (3) Có mấy loại index. (4) Cách thiết kế index: thứ tự cột, covering, JOIN, ORDER BY. (5) Các lỗi thường gặp. (6) Làm sao biết index có đang được dùng hay không, bằng EXPLAIN hoặc EXPLAIN ANALYZE. Mục tiêu là hiểu khi nào index giúp query nhanh hơn và khi nào nó gây hại.
 
 ---
 
@@ -31,106 +41,49 @@ Deck: https://www.canva.com/design/DAHYhGFyqoI/DXfLNbB4reodOOOhBwBHPQ/edit
 
 ---
 
-## Slide 3: Index Types at a Glance
+## Slide 3: What is a B-tree?
 
-- B-tree (default): equality, range, sort, LIKE 'abc%'
-- Unique: prevents duplicate values
-- Composite: multiple columns, leftmost prefix rule
-- Partial / Filtered: index only some rows
-- Full-text, GIN / GiST: text, JSONB, geometry
-- Covering, Clustered, Non-clustered
+- The default index structure: a balanced tree (root, internal nodes, linked leaf nodes)
+- Supports equality, range, sort (ORDER BY) and prefix LIKE 'abc%'
+- Cannot help LIKE '%abc' (leading wildcard)
+- Duplicate keys: search the parent node holding the key, then the adjacent leaf nodes
+- Unique index = a rule on a B-tree; the primary key creates one automatically
 
-**Hình:** Lưới 8 loại index
+**Hình:** Cây B-tree 3 tầng vẽ lại từ ảnh tham khảo: root [100 155 226]; tầng 2 [48 50 79], [128 140], [168 200], [270 290]; tầng 3 [105 117], [120], [145] dưới [128 140] và [250 264], [299], [300 320 439] dưới [270 290]
 
-**Ghi chú:** Đây là bức tranh tổng quan các loại index. B-tree là mặc định và dùng cho so sánh bằng, range, sort, LIKE theo prefix. Unique chống trùng giá trị (primary key tự tạo unique index). Composite dùng cho nhiều cột. Partial/Filtered chỉ index một phần dòng. Full-text và GIN/GiST cho văn bản, JSONB, hình học. Covering, Clustered, Non-clustered sẽ nói kỹ ở các slide sau. Không cần nhớ hết, cứ nhớ B-tree là mặc định.
-
----
-
-## Slide 4: B-tree and Unique Index
-
-- CREATE INDEX idx_orders_customer ON orders (customer_id);
-- CREATE UNIQUE INDEX idx_users_email ON users (email);
-- B-tree cannot help LIKE '%abc' (leading wildcard)
-- Duplicates already in the column: cannot create a unique index
-- No duplicates yet: the unique index then rejects new duplicates
-- Primary key creates a unique index automatically
-
-**Hình:** Cây B-tree, đường tìm số 50, các leaf nối nhau, ghi chú key trùng
-
-**Ghi chú:** B-tree là cấu trúc index mặc định. Lưu ý trường hợp đặc biệt: nếu có nhiều key trùng nhau thì sẽ tìm ở node cha chứa key đó rồi sang leaf node liền kề. Unique index là một quy tắc chạy trên B-tree: nếu cột đã có giá trị trùng thì không tạo được; nếu ban đầu chưa trùng thì tạo được và từ đó cột bị chặn không cho thêm giá trị trùng. B-tree không dùng được cho LIKE '%abc' vì wildcard đứng đầu.
+**Ghi chú:** B-tree là cấu trúc dữ liệu cây mặc định của index (khoảng 2 phút). Tìm kiếm đi từ root xuống các node trong rồi tới leaf node; các leaf được nối theo thứ tự nên rất hợp cho range và sort. B-tree dùng được cho so sánh bằng, range, ORDER BY và LIKE 'abc%' (prefix), nhưng không dùng được cho LIKE '%abc' vì wildcard đứng đầu. Trường hợp đặc biệt: nếu có nhiều key trùng nhau thì sẽ tìm ở node cha chứa key đó rồi tìm sang leaf node liền kề. Unique index là một quy tắc chạy trên B-tree: nếu cột đã có giá trị trùng thì không tạo được; nếu ban đầu chưa trùng thì tạo được và từ đó cột bị chặn không cho thêm giá trị trùng. Primary key tự tạo unique index.
 
 ---
 
-## Slide 5: Composite Index and Leftmost Prefix
+## Slide 4: How Many Types of Index?
 
-- CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at);
-- Sorted by the first column; ties are sorted by the next column
-- Index (a, b, c) works for: a | a, b | a, b, c
-- It does NOT work for b alone or c alone
-- Equality columns first, then the first range column
+- B-tree (default) and Unique: equality, range, sort, LIKE 'abc%'; no duplicate values
+- Composite: many columns, leftmost prefix; Partial / Filtered: only some rows
+- Full-text and GIN / GiST: text search, JSONB, arrays, geometry
+- Covering: INCLUDE columns, no table read (Index Only Scan)
+- Clustered: physical row order, 1 per table; Non-clustered: separate pointers, many
 
-**Hình:** Bảng sắp theo (customer_id, created_at); các WHERE dùng được / không dùng được
+**Hình:** Lưới 9 loại index (B-tree, Unique, Composite, Partial / Filtered, Full-text, GIN / GiST, Covering, Clustered, Non-clustered)
 
-**Ghi chú:** Composite index là một key gồm nhiều cột. Nó sắp xếp theo cột đầu tiên, nếu cột đầu trùng thì mới dùng cột tiếp theo để sắp xếp. Vì vậy index chỉ có tác dụng khi tìm theo cả bộ key hoặc theo cột đầu tiên. Nếu chỉ tìm theo cột thứ hai thì không dùng được, vì phải tìm tuần tự theo từng cột, không thể bỏ qua cột đầu. Đây là quy tắc leftmost prefix. Quy ước: cột so sánh bằng đặt trước, cột range đặt sau.
-
----
-
-## Slide 6: Partial, Full-text, GIN and GiST
-
-- Partial: CREATE INDEX ... WHERE status = 'pending' (PostgreSQL; MySQL has no WHERE)
-- Full-text: MySQL FULLTEXT; PostgreSQL GIN on to_tsvector
-- GIN: JSONB, arrays, full-text
-- GiST: geometry, ranges, distance queries
-- Partial indexes are smaller because they cover only some rows
-
-**Hình:** Partial (chỉ dòng pending được index), GIN (inverted index), GiST (điểm gần vị trí)
-
-**Ghi chú:** Partial index (PostgreSQL) tạo cấu trúc phụ chỉ cho những record thỏa điều kiện, không phải toàn bộ bảng; MySQL không hỗ trợ WHERE khi tạo index (SQL Server gọi là filtered index). Full-text sẽ tokenize nội dung văn bản để tìm kiếm ngôn ngữ tự nhiên: MySQL dùng FULLTEXT, PostgreSQL dùng GIN trên to_tsvector. GIN dùng cho JSONB, array, full-text; GiST dùng cho dữ liệu hình học, range, truy vấn theo khoảng cách.
+**Ghi chú:** Có 9 loại index trong tài liệu này (khoảng 2 phút). B-tree là mặc định, dùng cho so sánh bằng, range, sort, LIKE theo prefix. Unique chống trùng giá trị, primary key tự tạo unique index. Composite dùng cho nhiều cột, theo quy tắc leftmost prefix. Partial/Filtered chỉ index một phần dòng (PostgreSQL gọi là partial, SQL Server gọi là filtered). Full-text và GIN/GiST cho văn bản, JSONB, hình học. Covering dùng INCLUDE để không phải đọc bảng. Clustered quy định thứ tự vật lý của dòng nên mỗi bảng chỉ có 1; non-clustered là cấu trúc riêng trỏ về dòng và có thể có nhiều. Composite và covering sẽ nói kỹ ở slide thiết kế index. Không cần nhớ hết, cứ nhớ B-tree là mặc định.
 
 ---
 
-## Slide 7: Covering, Clustered and Non-clustered
+## Slide 5: Designing Indexes: Order, Covering, JOIN, ORDER BY
 
-- Covering: INCLUDE (total, status) so the query never reads the table
-- Best for hot queries: dashboards, API endpoints
-- INCLUDE columns are not used for sorting
-- Clustered: physical row order, only 1 per table
-- Non-clustered: separate structure pointing to rows, many allowed
+- Composite: equality columns first, then the first range column (most selective first)
+- Leftmost prefix: (a, b, c) serves a, (a, b), (a, b, c), but not b or c alone
+- Covering: INCLUDE (total, status) skips the table read; great for hot queries
+- JOIN: index the foreign key on the "many" side; add filter columns too
+- ORDER BY / GROUP BY: an index matching WHERE + ORDER BY skips the sort step
 
-**Hình:** Non-clustered + tra bảng; covering (không đọc bảng); Clustered so với Non-clustered
+**Hình:** 4 thẻ: Column order, Covering, JOIN, ORDER BY / GROUP BY
 
-**Ghi chú:** Covering index (PostgreSQL 11+ / SQL Server) cho phép lấy giá trị các cột đã được cover lúc tạo index mà không cần quay lại bảng chính (các cột cover không dùng để sắp xếp). Nên dùng cho query chạy thường xuyên. Clustered quy định thứ tự vật lý của dòng nên mỗi bảng chỉ có 1; non-clustered là cấu trúc riêng trỏ về dòng dữ liệu và có thể có nhiều. Bài viết gốc chỉ nhắc tới clustered ở phần FAQ.
-
----
-
-## Slide 8: Column Order in Composite Indexes
-
-- Equality columns first, then the first range column
-- Columns after a range condition cannot use the index
-- Among equality columns: most selective column first
-- Leftmost prefix: (a, b, c) serves a, (a, b), (a, b, c)
-- Prefer one composite index over many single-column indexes
-
-**Hình:** Chuỗi 1 equality → 2 equality → 3 first range → sau range không dùng được
-**Ghi chú:** Thứ tự cột quyết định index có được dùng hay không. Đặt cột so sánh bằng trước, rồi tới cột range đầu tiên; cột đứng sau điều kiện range không dùng được index. Giữa các cột equality, đặt cột có độ chọn lọc (selectivity) cao nhất trước. Nhắc lại leftmost prefix: index (a, b, c) dùng được cho a, (a, b), (a, b, c) nhưng không dùng được cho riêng b hoặc c. Thà tạo một composite index còn hơn là nhiều index đơn cột. Vì sao equality đặt trước: các dòng cùng giá trị equality nằm liền nhau trong index nên điều kiện range cắt được một đoạn liên tục; sau cột range thì các cột kế tiếp không còn được sắp xếp trong đoạn đó nên không thu hẹp thêm được.
+**Ghi chú:** Slide này gom các mục thiết kế index (khoảng 4 phút). (1) Composite: cột so sánh bằng đặt trước, rồi tới cột range đầu tiên; giữa các cột equality đặt cột có độ chọn lọc (selectivity) cao nhất trước. Cột đứng sau điều kiện range không dùng được index. Leftmost prefix: index (a, b, c) dùng được cho a, (a, b), (a, b, c) nhưng không dùng được riêng b hoặc c. (2) Covering: INCLUDE các cột query cần để không phải quay lại đọc bảng; nên dùng cho query chạy thường xuyên như dashboard, API endpoint. (3) JOIN: index cột foreign key ở phía nhiều; primary key phía một đã có index sẵn; nếu JOIN kèm điều kiện lọc thì đưa cả cột lọc vào composite index. (4) ORDER BY / GROUP BY: index khớp thứ tự cột của WHERE và ORDER BY có thể bỏ được bước sort; GROUP BY dùng index trên cột nhóm, cột INCLUDE hỗ trợ hàm tổng hợp.
 
 ---
 
-## Slide 9: Indexes for JOIN, ORDER BY, GROUP BY
-
-- JOIN: index the foreign key on the "many" side (the primary key is already indexed)
-- JOIN + filter: put the filter columns into the composite index too
-- ORDER BY: an index matching WHERE + ORDER BY can skip the sort step
-- Sort direction should match, although many databases can scan backwards
-- GROUP BY: index the grouping columns; INCLUDE columns help aggregates
-
-**Hình:** orders (many) – customers (one); ORDER BY không cần bước sort; GROUP BY
-
-**Ghi chú:** Với JOIN: index cột foreign key ở phía nhiều (many); primary key ở phía một đã có index sẵn. Nếu JOIN kèm điều kiện lọc thì đưa cả cột lọc vào composite index. Với ORDER BY: index khớp thứ tự cột của WHERE và ORDER BY có thể bỏ được bước sort; hướng sắp xếp nên khớp, dù nhiều DB vẫn quét ngược được. Với GROUP BY: dùng index trên cột nhóm, cột INCLUDE hỗ trợ các hàm tổng hợp.
-
----
-
-## Slide 10: 7 Common Indexing Mistakes
+## Slide 6: 7 Common Indexing Mistakes
 
 1. Many single-column indexes instead of one composite index
 2. Wrong composite column order (low-selectivity column first)
@@ -146,42 +99,14 @@ Deck: https://www.canva.com/design/DAHYhGFyqoI/DXfLNbB4reodOOOhBwBHPQ/edit
 
 ---
 
-## Slide 11: Verify with EXPLAIN
+## Slide 7: How Do I Know an Index Is Used?
 
-- PostgreSQL: EXPLAIN ANALYZE
-- MySQL: EXPLAIN
+- PostgreSQL: EXPLAIN ANALYZE   |   MySQL: EXPLAIN
 - SQL Server: actual execution plan and SET STATISTICS IO ON
+- Index used? Look for Index Scan / Index Only Scan instead of Seq Scan
 - Test with realistic data volumes: the optimizer picks different plans by table size
-- Compare the plan before and after creating the index
+- Also check usage with system views; keep stats fresh (ANALYZE), drop unused indexes
 
 **Hình:** Before (Seq Scan on orders) → After (Index Scan using idx_orders_customer)
 
-**Ghi chú:** Không đoán mò, hãy kiểm tra bằng EXPLAIN: PostgreSQL dùng EXPLAIN ANALYZE, MySQL dùng EXPLAIN, SQL Server xem actual execution plan và SET STATISTICS IO ON. Phải test với lượng dữ liệu thực tế, vì optimizer chọn plan khác nhau tùy kích thước bảng. Gợi ý demo: tạo bảng orders khoảng 1 triệu dòng và so sánh plan trước/sau khi tạo index trên customer_id.
-
----
-
-## Slide 12: Index Maintenance
-
-- Update statistics (ANALYZE in PostgreSQL)
-- Rebuild / reorganize indexes
-- Schedule maintenance during off-peak hours
-- Drop unused indexes; list them via system views
-- OLTP tables usually carry about 3 to 8 indexes: start from WHERE, JOIN, ORDER BY columns
-
-**Hình:** Vòng lặp ANALYZE → Rebuild/Reorganize → Check usage → Drop unused
-
-**Ghi chú:** Index cần được bảo trì định kỳ: cập nhật thống kê (ANALYZE trong PostgreSQL), rebuild/reorganize index, và nên lên lịch vào giờ thấp điểm. Số lượng index tùy workload; bảng OLTP thường khoảng 3 đến 8. Cách làm: bắt đầu từ các cột trong WHERE, JOIN, ORDER BY rồi xóa những index không được dùng.
-
----
-
-## Slide 13: Quick Q&A Recap
-
-- Default index type? B-tree: equality, range, sort, prefix LIKE
-- Does index (a, b, c) serve WHERE b = 1? No: leftmost prefix
-- Why does WHERE LOWER(email) = 'x' skip the index? Function on the column: use an expression index
-- Clustered vs non-clustered? Physical row order (1 per table) vs separate pointer structure
-- How to know an index is used? EXPLAIN / EXPLAIN ANALYZE and system views
-
-**Hình:** 4 ô Q&A
-
-**Ghi chú:** Tổng kết nhanh bằng các câu hỏi. Index mặc định là B-tree. Index (a, b, c) không dùng được cho WHERE b = 1 vì vi phạm leftmost prefix. WHERE LOWER(email) = 'x' không dùng index thường trên email vì hàm bọc cột; dùng expression index hoặc viết lại query. Clustered quy định thứ tự vật lý (chỉ 1 mỗi bảng), non-clustered là cấu trúc riêng trỏ tới dòng. Muốn biết index có được dùng thì dùng EXPLAIN và system view. Có thể để khán giả trả lời trước khi chuyển slide.
+**Ghi chú:** Làm sao biết index có đang hoạt động hay không (khoảng 3 phút): không đoán mò, hãy kiểm tra bằng EXPLAIN. PostgreSQL dùng EXPLAIN ANALYZE, MySQL dùng EXPLAIN, SQL Server xem actual execution plan và SET STATISTICS IO ON. Nếu plan hiện Index Scan hoặc Index Only Scan là index đang được dùng; nếu là Seq Scan thì đang quét toàn bảng. Phải test với lượng dữ liệu thực tế, vì optimizer chọn plan khác nhau tùy kích thước bảng. Ngoài ra có thể xem system view thống kê việc dùng index, cập nhật thống kê (ANALYZE), rebuild/reorganize vào giờ thấp điểm, và xóa index không dùng. Gợi ý demo: tạo bảng orders khoảng 1 triệu dòng và so sánh plan trước/sau khi tạo index trên customer_id.
