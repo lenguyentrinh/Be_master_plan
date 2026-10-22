@@ -9,10 +9,10 @@
 ## Key concepts
 
 ### 1. Index là gì
-- Index là một cấu trúc dữ liệu phụ, giúp tìm dòng dữ liệu nhanh hơn.
+- Index là một cấu trúc dữ liệu phụ
 - Index giúp database tìm dòng dữ liệu mà không phải quét toàn bộ bảng (full table scan).
 - Đánh đổi: **đọc nhanh hơn, ghi chậm hơn** (mỗi INSERT/UPDATE/DELETE phải cập nhật cả index) và tốn thêm bộ nhớ/ổ đĩa.
-- Ví dụ trong bài: B-tree index trên `customer_id` của bảng 1 triệu dòng giảm I/O khoảng 10.000 lần (số liệu minh họa của bài viết, không phải benchmark).
+
 
 ### 2. Các loại index
 

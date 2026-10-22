@@ -1,6 +1,6 @@
 # Examples: Database Indexes
 
-Mỗi slide (1 đến 7) có một ví dụ riêng, khớp với `slide_content.md`. Mặc định dùng PostgreSQL, trừ khi ghi chú khác. Các ví dụ dùng chung hai bảng `customers` và `orders` ở phần Setup. Mỗi ví dụ chạy độc lập; nếu trùng tên index thì `DROP INDEX` trước khi chạy lại.
+Mỗi slide (1 đến 6) có một ví dụ riêng, khớp với `slide_content.md`. Mặc định dùng PostgreSQL, trừ khi ghi chú khác. Các ví dụ dùng chung hai bảng `customers` và `orders` ở phần Setup. Mỗi ví dụ chạy độc lập; nếu trùng tên index thì `DROP INDEX` trước khi chạy lại.
 
 ## Setup
 
@@ -104,20 +104,20 @@ EXPLAIN SELECT * FROM customers WHERE email LIKE '%42@example.com';  -- Seq Scan
 
 ## Slide 4: How Many Types of Index?
 
-Mỗi loại index một câu lệnh tạo (9 loại).
+Mỗi loại index một câu lệnh tạo (8 loại; Full-text của MySQL và GIN/GiST của PostgreSQL gộp chung một loại vì cùng phục vụ tìm kiếm văn bản và dữ liệu đặc biệt, chỉ khác hệ DB).
 
 ```sql
 CREATE INDEX        idx_orders_customer  ON orders (customer_id);                  -- 1. B-tree (mặc định)
 CREATE UNIQUE INDEX idx_customers_email  ON customers (email);                     -- 2. Unique
 CREATE INDEX        idx_orders_cust_date ON orders (customer_id, created_at);      -- 3. Composite
 CREATE INDEX        idx_orders_pending   ON orders (created_at)
-                    WHERE status = 'pending';                                      -- 4. Partial (PostgreSQL)
+                    WHERE status = 'pending';                                      -- 5. Partial (PostgreSQL)
 CREATE INDEX        idx_orders_cover     ON orders (customer_id)
-                    INCLUDE (total, status);                                       -- 7. Covering
+                    INCLUDE (total, status);                                       -- 6. Covering
 ```
 
 ```sql
--- 5. Full-text
+-- 4. Full-text / GIN / GiST
 -- MySQL
 CREATE FULLTEXT INDEX idx_articles_content ON articles (title, body);
 SELECT * FROM articles WHERE MATCH(title, body) AGAINST('my name is');                       -- từ khóa không cần liền kề
@@ -129,15 +129,15 @@ WHERE to_tsvector('english', title || ' ' || body) @@ plainto_tsquery('english',
 SELECT id, title FROM articles
 WHERE to_tsvector('english', title || ' ' || body) @@ phraseto_tsquery('english', 'database design');   -- liền kề
 
--- 6. GIN (JSONB, array, full-text) / GiST (hình học, range, khoảng cách)
+-- PostgreSQL: GIN (JSONB, array, full-text) / GiST (hình học, range, khoảng cách)
 CREATE INDEX idx_products_tags       ON products  USING gin  (tags);
 CREATE INDEX idx_locations_coords    ON locations USING gist (coordinates);
 ```
 
 ```sql
--- 8. Clustered (SQL Server): quy định thứ tự vật lý, mỗi bảng chỉ 1
+-- 7. Clustered (SQL Server): quy định thứ tự vật lý, mỗi bảng chỉ 1
 CREATE CLUSTERED INDEX cix_orders_id ON orders (id);
--- 9. Non-clustered: cấu trúc riêng trỏ về dòng dữ liệu, có thể có nhiều
+-- 8. Non-clustered: cấu trúc riêng trỏ về dòng dữ liệu, có thể có nhiều
 CREATE NONCLUSTERED INDEX ix_orders_customer ON orders (customer_id);
 -- PostgreSQL không có clustered index thực sự; CLUSTER chỉ sắp xếp lại bảng một lần
 CLUSTER orders USING idx_orders_customer;
@@ -145,9 +145,9 @@ CLUSTER orders USING idx_orders_customer;
 
 ---
 
-## Slide 5: Designing Indexes: Order, Covering, JOIN, ORDER BY
+### Slide 4 (tiếp): thiết kế index: thứ tự cột, covering, JOIN, ORDER BY
 
-Một chuỗi ví dụ trên cùng bảng `orders`.
+Phần thiết kế index nằm trong slide 4 (không còn slide riêng). Một chuỗi ví dụ trên cùng bảng `orders`.
 
 ```sql
 -- Composite + leftmost prefix
@@ -183,7 +183,7 @@ EXPLAIN SELECT status, SUM(total) FROM orders GROUP BY status;
 
 ---
 
-## Slide 6: 7 Common Indexing Mistakes
+## Slide 5: 7 Common Indexing Mistakes
 
 Ví dụ cho lỗi số 3 (hàm bọc cột), cách sửa bằng expression index, lỗi số 5 (thiếu index khóa ngoại) và lỗi số 1.
 
@@ -207,7 +207,7 @@ CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at);
 
 ---
 
-## Slide 7: How Do I Know an Index Is Used?
+## Slide 6: How Do I Know an Index Is Used?
 
 ```sql
 -- PostgreSQL
