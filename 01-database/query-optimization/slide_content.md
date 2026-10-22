@@ -34,7 +34,7 @@ Deck: https://www.canva.com/design/DAHYhGFyqoI/DXfLNbB4reodOOOhBwBHPQ/edit
 - Auto update: SQL Server on big data changes, PostgreSQL auto-analyze after a threshold
 - Manual: ANALYZE (PostgreSQL), UPDATE STATISTICS (SQL Server)
 
-**Hình:** Plan trước/sau: Seq Scan → Index Scan; ô nhỏ "Statistics → Optimizer → Plan"
+**Hình:** Luồng 3 ô "Table statistics → Optimizer → Execution plan" và một dải cảnh báo "Stale statistics → wrong estimates → bad plan; Fix: ANALYZE / UPDATE STATISTICS"
 
 **Ghi chú:** Nguyên tắc đầu tiên là đo trước khi sửa (kỹ thuật 5 và 11, khoảng 3 phút). EXPLAIN cho biết DB sẽ chạy query như thế nào. Cần chú ý full table scan (thường do thiếu index hoặc WHERE chưa tốt), cách join chưa hợp lý, chi phí sort cao và việc tạo bảng tạm. Optimizer chọn plan dựa trên statistics, nên statistics cũ sẽ cho plan tệ, ví dụ chọn sai index hoặc quét toàn bảng. SQL Server tự cập nhật khi dữ liệu đổi nhiều, PostgreSQL có auto-analyze khi vượt ngưỡng; khi cần có thể chạy ANALYZE hoặc UPDATE STATISTICS thủ công.
 

@@ -8,3 +8,7 @@
 6. Hai mục Q&A và Hands-on trong README không làm slide.
 7. Chữ trên slide viết bằng tiếng Anh; mỗi slide phải có speaker notes bằng tiếng Việt.
 8. Mỗi topic có thêm `slide_content.md` (nội dung từng slide) và `example.md` (mỗi slide một ví dụ); khi deck thay đổi phải cập nhật hai file này cho khớp.
+9. **Quy trình làm mỗi topic, theo đúng thứ tự:**
+   1. Đọc refer tham khảo, ghi note vào `README.md` của topic.
+   2. Tạo slide trên Canva (deck dùng chung, mỗi topic nối tiếp topic trước). Ghi rõ cách làm: font chữ Nunito (tiêu đề cỡ 44, gạch đầu dòng cỡ 24 đến 30 tùy độ dài), mỗi topic dùng một bảng màu khác nhau để dễ nhận biết (Indexes: nền đen, xanh lá; Query optimization: nền navy, cyan). Cách trình bày mỗi topic được sáng tạo tự do, miễn người đọc dễ đọc. Mỗi slide có tiêu đề, gạch đầu dòng và hình minh họa; phần ghi chú chỉ để ở speaker notes tiếng Việt bên dưới, không ghi chú thêm trên slide.
+   3. Sau khi slide xong mới thêm `example.md` và `slide_content.md` cho khớp với deck.
