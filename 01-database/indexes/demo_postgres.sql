@@ -1,6 +1,11 @@
--- DEMO INDEX TRÊN POSTGRESQL (11 trở lên)
--- Ngữ cảnh: cơ sở dữ liệu dân cư quốc gia, một bảng users, mỗi dòng là một công dân.
--- Đọc EXPLAIN: "Seq Scan" = quét toàn bảng; có chữ "Index" = có dùng index.
+-- INDEX DEMO ON POSTGRESQL (11 or later)
+-- Scenario: a national population database. One table, `users`; each row is one citizen.
+-- How to read EXPLAIN:
+--   "Seq Scan"                    -> full table scan (no index used)
+--   anything containing "Index"   -> an index is used (Index Scan, Index Only Scan, Bitmap Index Scan)
+-- EXPLAIN only shows the PLANNED execution (estimates); it does NOT run the query.
+-- EXPLAIN ANALYZE actually RUNS the query and adds real row counts and timings.
+--   Careful: with INSERT / UPDATE / DELETE it really changes data (wrap it in BEGIN ... ROLLBACK).
 
 
 -- ===================== SETUP =====================
@@ -8,20 +13,20 @@ DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
     id                serial PRIMARY KEY,
-    national_id       text NOT NULL,              -- số căn cước
+    national_id       text NOT NULL,              -- national ID number
     full_name         text NOT NULL,
-    gender            text NOT NULL,              -- 'M' hoặc 'F'
-    birth_date        date NOT NULL,              -- ngày sinh
-    status            text NOT NULL,              -- 'alive' (còn sống) hoặc 'dead' (đã mất)
-    death_date        date,                       -- NULL nếu còn sống
-    province          text NOT NULL,              -- tỉnh (63 tỉnh)
-    household_head_id int REFERENCES users(id),   -- chủ hộ (foreign key)
-    bio               text,                       -- mô tả về công dân
-    skills            text[],                     -- kỹ năng
-    home_location     point                       -- toạ độ nhà
+    gender            text NOT NULL,              -- 'M' or 'F'
+    birth_date        date NOT NULL,
+    status            text NOT NULL,              -- 'alive' or 'dead'
+    death_date        date,                       -- NULL while the person is alive
+    province          text NOT NULL,              -- province (63 provinces)
+    household_head_id int REFERENCES users(id),   -- head of household (foreign key; PostgreSQL does NOT index it automatically)
+    bio               text,                       -- free-text description of the citizen
+    skills            text[],                     -- array of skills
+    home_location     point                       -- home coordinates
 );
 
--- 100.000 công dân, 30% đã mất
+-- Generate 100,000 citizens, 30% of them dead
 INSERT INTO users (national_id, full_name, gender, birth_date, status, death_date, province, bio, skills, home_location)
 SELECT lpad(g::text, 12, '0'),
        'Nguyen Van ' || g,
@@ -39,119 +44,122 @@ SELECT lpad(g::text, 12, '0'),
 FROM generate_series(1, 100000) g;
 
 UPDATE users SET household_head_id = id / 10 WHERE id > 10;
-ANALYZE users;
+ANALYZE users;   -- refresh table statistics so the planner makes good decisions
 
 
--- ===================== SLIDE 4: CÁC LOẠI INDEX =====================
+-- ===================== SLIDE 4: TYPES OF INDEX =====================
 
--- B-tree (mặc định)
+-- 1. B-tree (the default index type)
 CREATE INDEX idx_users_province   ON users (province);
 CREATE INDEX idx_users_birth_date ON users (birth_date);
-EXPLAIN SELECT * FROM users WHERE province = 'province_01';                                   -- bằng: công dân của một tỉnh (nhiều dòng trùng)
-EXPLAIN SELECT * FROM users WHERE birth_date >= '1990-01-01' AND birth_date < '1991-01-01';   -- range: người sinh năm 1990
-EXPLAIN SELECT * FROM users ORDER BY birth_date LIMIT 10;                                     -- sort: 10 người lớn tuổi nhất
+EXPLAIN SELECT * FROM users WHERE province = 'province_01';                                   -- equality: all citizens of one province (many duplicate values)
+EXPLAIN SELECT * FROM users WHERE birth_date >= '1990-01-01' AND birth_date < '1991-01-01';   -- range: people born in 1990
+EXPLAIN SELECT * FROM users ORDER BY birth_date LIMIT 10;                                     -- sort: the 10 oldest people; the index is already ordered, so no extra sorting is needed
 
-CREATE INDEX idx_users_name ON users (full_name text_pattern_ops);
-EXPLAIN SELECT * FROM users WHERE full_name LIKE 'Nguyen Van 500%';   -- prefix: dùng index
-EXPLAIN SELECT * FROM users WHERE full_name LIKE '%500';              -- wildcard đứng đầu: Seq Scan
+CREATE INDEX idx_users_name ON users (full_name text_pattern_ops);   -- text_pattern_ops lets LIKE 'abc%' use a B-tree index when the database collation is not "C"
+EXPLAIN SELECT * FROM users WHERE full_name LIKE 'Nguyen Van 500%';   -- prefix match: the index IS used
+EXPLAIN SELECT * FROM users WHERE full_name LIKE '%500';              -- leading wildcard: the index cannot be used, so Seq Scan
 
--- Unique
-CREATE UNIQUE INDEX idx_users_national_id ON users (national_id);     -- OK vì số căn cước chưa trùng
+-- 2. Unique (a B-tree that also rejects duplicate values)
+CREATE UNIQUE INDEX idx_users_national_id ON users (national_id);     -- OK: no duplicate national IDs exist yet
 INSERT INTO users (national_id, full_name, gender, birth_date, status, province)
-VALUES ('000000000001', 'Test', 'M', '2000-01-01', 'alive', 'province_01');   -- LỖI: trùng số căn cước, bị chặn
-CREATE UNIQUE INDEX idx_users_province_unique ON users (province);            -- LỖI: province đã có giá trị trùng, không tạo được
+VALUES ('000000000001', 'Test', 'M', '2000-01-01', 'alive', 'province_01');   -- ERROR (expected): duplicate national ID, the unique index blocks it
+CREATE UNIQUE INDEX idx_users_province_unique ON users (province);            -- ERROR (expected): `province` already has duplicate values, so the index cannot be created
 
--- Composite (leftmost prefix)
+-- 3. Composite (several columns, leftmost-prefix rule)
 CREATE INDEX idx_users_province_birth ON users (province, birth_date);
-EXPLAIN SELECT * FROM users WHERE province = 'province_01';                                   -- dùng index (cột đầu)
-EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND birth_date >= '1990-01-01';    -- dùng index (cả 2 cột)
-EXPLAIN SELECT * FROM users WHERE birth_date >= '1990-01-01' AND gender = 'F';                -- thiếu cột đầu province: không dùng
+EXPLAIN SELECT * FROM users WHERE province = 'province_01';                                   -- uses the index (leading column only)
+EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND birth_date >= '1990-01-01';    -- uses the index (both columns)
+EXPLAIN SELECT * FROM users WHERE birth_date >= '1990-01-01' AND gender = 'F';                -- leading column `province` is missing: the composite index is NOT used
 
--- Partial: lao động thì phải còn sống, chỉ index người còn sống
+-- 4. Partial: a working person must be alive, so index only the people who are alive
 CREATE INDEX idx_users_alive ON users (province, birth_date) WHERE status = 'alive';
 EXPLAIN SELECT * FROM users
-WHERE status = 'alive' AND province = 'province_01' AND birth_date BETWEEN '1996-01-01' AND '2001-12-31';
+WHERE status = 'alive' AND province = 'province_01' AND birth_date BETWEEN '1996-01-01' AND '2001-12-31';   -- the query repeats the index condition (status = 'alive'), so the partial index can be used
 SELECT pg_size_pretty(pg_relation_size('idx_users_alive'))          AS partial_size,
-       pg_size_pretty(pg_relation_size('idx_users_province_birth')) AS full_size;    -- partial nhỏ hơn
+       pg_size_pretty(pg_relation_size('idx_users_province_birth')) AS full_size;    -- the partial index is smaller
 
--- Full-text: tìm trong bio
+-- 5. Full-text: search inside `bio` (GIN)
 CREATE INDEX idx_users_bio ON users USING gin (to_tsvector('english', bio));
-SELECT count(*) FROM users WHERE to_tsvector('english', bio) @@ plainto_tsquery('english', 'database design');    -- TH1: 2 từ không cần liền kề
-SELECT count(*) FROM users WHERE to_tsvector('english', bio) @@ phraseto_tsquery('english', 'database design');   -- TH2: phải liền kề
+SELECT count(*) FROM users WHERE to_tsvector('english', bio) @@ plainto_tsquery('english', 'database design');    -- case 1: both words must appear, but not necessarily next to each other
+SELECT count(*) FROM users WHERE to_tsvector('english', bio) @@ phraseto_tsquery('english', 'database design');   -- case 2: the exact phrase, words next to each other
 
--- GIN (mảng) và GiST (hình học)
+-- GIN for arrays and GiST for geometric data
 CREATE INDEX idx_users_skills ON users USING gin (skills);
-EXPLAIN SELECT * FROM users WHERE skills @> ARRAY['sql'];                  -- người có kỹ năng sql
+EXPLAIN SELECT * FROM users WHERE skills @> ARRAY['sql'];                  -- people whose skills array contains 'sql'
 
 CREATE INDEX idx_users_location ON users USING gist (home_location);
-EXPLAIN SELECT * FROM users WHERE home_location <@ box '((0,0),(5,5))';    -- người sống trong một vùng
+EXPLAIN SELECT * FROM users WHERE home_location <@ box '((0,0),(5,5))';    -- people living inside a rectangular area
 
--- Covering (INCLUDE)
+-- 6. Covering (INCLUDE)
 CREATE INDEX idx_users_province_cover ON users (province) INCLUDE (full_name);
-VACUUM ANALYZE users;
-EXPLAIN SELECT province, full_name FROM users WHERE province = 'province_01';   -- Index Only Scan: không đọc bảng
+VACUUM ANALYZE users;   -- builds the visibility map, which Index Only Scan needs
+EXPLAIN SELECT province, full_name FROM users WHERE province = 'province_01';   -- Index Only Scan: the table is not read
 
--- Clustered / Non-clustered
--- Mọi CREATE INDEX ở trên là non-clustered. PostgreSQL không có clustered index tự duy trì.
+-- 7. Clustered / 8. Non-clustered
+-- Every CREATE INDEX above creates a non-clustered index.
+-- PostgreSQL has no self-maintaining clustered index; the CLUSTER command only reorders the table once.
 
 
--- ===================== SLIDE 5: 7 LỖI THƯỜNG GẶP =====================
+-- ===================== SLIDE 5: 7 COMMON INDEXING MISTAKES =====================
+-- Remove the indexes from the previous section so each mistake starts from a clean state.
 DROP INDEX idx_users_province, idx_users_birth_date, idx_users_name, idx_users_national_id,
            idx_users_province_birth, idx_users_alive, idx_users_bio, idx_users_skills,
            idx_users_location, idx_users_province_cover;
 
--- Lỗi 1: nhiều index đơn cột thay vì một composite
+-- Mistake 1: several single-column indexes instead of one composite index
 CREATE INDEX idx_users_province ON users (province);
 CREATE INDEX idx_users_status   ON users (status);
 CREATE INDEX idx_users_gender   ON users (gender);
-EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND status = 'alive' AND gender = 'F';   -- phải gộp nhiều index
+EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND status = 'alive' AND gender = 'F';   -- PostgreSQL has to combine several indexes (BitmapAnd), which costs extra work
 
 DROP INDEX idx_users_province, idx_users_status, idx_users_gender;
 CREATE INDEX idx_users_province_status_gender ON users (province, status, gender);
-EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND status = 'alive' AND gender = 'F';   -- chỉ một index
+EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND status = 'alive' AND gender = 'F';   -- fix: a single composite index is enough
 
--- Lỗi 2: sai thứ tự cột composite
+-- Mistake 2: wrong column order in a composite index
 DROP INDEX idx_users_province_status_gender;
 CREATE INDEX idx_users_birth_province ON users (birth_date, province);
-EXPLAIN SELECT * FROM users WHERE province = 'province_01';    -- thiếu cột đầu birth_date: không dùng hiệu quả
+EXPLAIN SELECT * FROM users WHERE province = 'province_01';    -- leading column `birth_date` is missing: the index is not used effectively
 
 CREATE INDEX idx_users_province_birth ON users (province, birth_date);
-EXPLAIN SELECT * FROM users WHERE province = 'province_01';    -- dùng index
+EXPLAIN SELECT * FROM users WHERE province = 'province_01';    -- fix: `province` is now the leading column, so the index is used
 
--- Lỗi 3: bọc hàm lên cột đã index (đếm người sinh năm 1990)
+-- Mistake 3: wrapping an indexed column in a function (count people born in 1990)
 CREATE INDEX idx_users_birth_date ON users (birth_date);
-EXPLAIN SELECT count(*) FROM users WHERE EXTRACT(YEAR FROM birth_date) = 1990;                       -- Seq Scan
+EXPLAIN SELECT count(*) FROM users WHERE EXTRACT(YEAR FROM birth_date) = 1990;                       -- the function hides the column: Seq Scan
 
-EXPLAIN SELECT count(*) FROM users WHERE birth_date >= '1990-01-01' AND birth_date < '1991-01-01';   -- Cách 1: viết lại thành range
+EXPLAIN SELECT count(*) FROM users WHERE birth_date >= '1990-01-01' AND birth_date < '1991-01-01';   -- fix 1: rewrite the condition as a range
 
-CREATE INDEX idx_users_birth_year ON users ((EXTRACT(YEAR FROM birth_date)));                        -- Cách 2: expression index
-EXPLAIN SELECT count(*) FROM users WHERE EXTRACT(YEAR FROM birth_date) = 1990;
+CREATE INDEX idx_users_birth_year ON users ((EXTRACT(YEAR FROM birth_date)));                        -- fix 2: expression index
+EXPLAIN SELECT count(*) FROM users WHERE EXTRACT(YEAR FROM birth_date) = 1990;                       -- the expression matches the index exactly, so it is used
 
--- Lỗi 4: quá nhiều index làm ghi chậm
+-- Mistake 4: too many indexes slow down writes
 SELECT indexrelname, pg_size_pretty(pg_relation_size(indexrelid)) AS size
-FROM pg_stat_user_indexes WHERE relname = 'users';    -- mỗi index tốn thêm dung lượng, và mỗi lần INSERT/UPDATE/DELETE đều phải cập nhật hết
+FROM pg_stat_user_indexes WHERE relname = 'users';    -- every index takes extra disk space, and every INSERT / UPDATE / DELETE has to maintain ALL of them
 
--- Lỗi 5: thiếu index cho foreign key (PostgreSQL không tự tạo)
-EXPLAIN SELECT * FROM users WHERE household_head_id = 5;    -- Seq Scan (tìm thành viên của một hộ)
+-- Mistake 5: foreign key without an index (PostgreSQL does not create one automatically)
+EXPLAIN SELECT * FROM users WHERE household_head_id = 5;    -- Seq Scan (find the members of one household)
 CREATE INDEX idx_users_household_head ON users (household_head_id);
-EXPLAIN SELECT * FROM users WHERE household_head_id = 5;    -- dùng index
+EXPLAIN SELECT * FROM users WHERE household_head_id = 5;    -- fix: the index is used
 
--- Lỗi 6: bỏ qua NULL, nên dùng partial index (70% người còn sống nên death_date là NULL)
-CREATE INDEX idx_users_death_full    ON users (death_date);
-CREATE INDEX idx_users_death_partial ON users (death_date) WHERE death_date IS NOT NULL;
+-- Mistake 6: ignoring NULLs, use a partial index instead (70% of people are alive, so death_date is NULL for most rows)
+CREATE INDEX idx_users_death_full    ON users (death_date);                                  -- stores every row, including all the NULLs
+CREATE INDEX idx_users_death_partial ON users (death_date) WHERE death_date IS NOT NULL;     -- skips the NULL rows
 SELECT pg_size_pretty(pg_relation_size('idx_users_death_full'))    AS full_size,
-       pg_size_pretty(pg_relation_size('idx_users_death_partial')) AS partial_size;
+       pg_size_pretty(pg_relation_size('idx_users_death_partial')) AS partial_size;          -- compare the sizes: the partial index is much smaller
 
--- Lỗi 7: không kiểm tra index có được dùng
+-- Mistake 7: never checking whether an index is actually used
 SELECT indexrelname, idx_scan AS times_used
-FROM pg_stat_user_indexes WHERE relname = 'users' ORDER BY idx_scan;   -- idx_scan = 0 là index chưa từng được dùng
+FROM pg_stat_user_indexes WHERE relname = 'users' ORDER BY idx_scan;   -- idx_scan = 0 means the index has never been used (candidate to drop)
 
 
--- ===================== SLIDE 6: LÀM SAO BIẾT INDEX CÓ ĐƯỢC DÙNG =====================
--- Tra cứu công dân theo số căn cước
+-- ===================== SLIDE 6: HOW DO I KNOW AN INDEX IS USED? =====================
+-- Look up a citizen by national ID.
+-- EXPLAIN ANALYZE is used here to show real timings; plain EXPLAIN is enough just to see whether an index is used.
 EXPLAIN ANALYZE SELECT * FROM users WHERE national_id = '000000050000';
--- Chưa có index: Seq Scan, thời gian vài chục ms
+-- No index yet: Seq Scan, execution time of a few tens of milliseconds
 
 CREATE INDEX idx_users_national_id ON users (national_id);
 EXPLAIN ANALYZE SELECT * FROM users WHERE national_id = '000000050000';
--- Có index: Index Scan, thời gian dưới 1 ms
+-- With the index: Index Scan, execution time under 1 ms

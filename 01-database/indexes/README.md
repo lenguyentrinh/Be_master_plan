@@ -21,10 +21,9 @@
 | **B-tree** (mặc định) | So sánh bằng (`email = 'alice@example.com'`), range (`age BETWEEN 10 AND 20`), sort (`ORDER BY email LIMIT 10`), `LIKE 'abc%'` (prefix) | Không dùng được cho `LIKE '%abc'` (wildcard đứng đầu) |
 | **Unique** | Chống trùng giá trị | Primary key tự tạo unique index |
 | **Composite** (nhiều cột) | Query lọc/sắp xếp theo nhiều cột | Thứ tự cột quan trọng, theo quy tắc *leftmost prefix* |
-| **Partial / Filtered** | Chỉ cần index một phần dòng (`WHERE ...`) | PostgreSQL gọi là partial, SQL Server gọi là filtered; index nhỏ hơn |
-| **Full-text** | Tìm kiếm văn bản | MySQL `FULLTEXT`; PostgreSQL GIN trên `to_tsvector` |
-| **GIN / GiST** (PostgreSQL) | GIN: JSONB, array, full-text. GiST: dữ liệu hình học, range, tìm theo khoảng cách | |
-| **Covering** | Index chứa đủ mọi cột query cần, không phải đọc bảng | Dùng `INCLUDE` (SQL Server, PostgreSQL 11+) |
+| **Partial** | Chỉ cần index một phần dòng (`WHERE ...`) | PostgreSQL hỗ trợ; MySQL không hỗ trợ; index nhỏ hơn |
+| **Full-text / GIN / GiST** | Tìm kiếm văn bản, JSONB, array, dữ liệu hình học | MySQL: `FULLTEXT`. PostgreSQL: GIN (full-text, JSONB, array), GiST (hình học, range, tìm theo khoảng cách). Gộp chung một loại vì hai bên dùng cơ chế khác nhau |
+| **Covering** | Index chứa đủ mọi cột query cần, không phải đọc bảng | PostgreSQL 11+ dùng `INCLUDE`; MySQL không có `INCLUDE`, đưa cột cần thêm vào composite index |
 | **Clustered** | Quy định thứ tự vật lý của dòng; mỗi bảng chỉ có 1 | Bài viết chỉ nhắc ở phần FAQ |
 | **Non-clustered** | Cấu trúc riêng, trỏ về dòng dữ liệu | Có thể có nhiều index loại này |
 
@@ -70,7 +69,7 @@ CREATE INDEX idx_products_tags ON products USING gin (tags);
 -- GiST: cho dữ liệu hình học, range, truy vấn theo khoảng cách
 CREATE INDEX idx_locations_coords ON locations USING gist (coordinates);
 
--- Covering (PostgreSQL 11+ / SQL Server): nó sẽ giúp việc lấy giá trị cột khác đã được cover lúc tạo covering index mà không cần refer đến bảng chính. (các cột cover không dùng để sắp xếp)
+-- Covering (PostgreSQL 11+): nó sẽ giúp việc lấy giá trị cột khác đã được cover lúc tạo covering index mà không cần refer đến bảng chính. (các cột cover không dùng để sắp xếp)
 CREATE INDEX idx_orders_cover ON orders (customer_id) INCLUDE (total, status);
 ```
 
@@ -97,10 +96,12 @@ CREATE INDEX idx_orders_cover ON orders (customer_id) INCLUDE (total, status);
 4. Quá nhiều index trên bảng ghi nhiều; cần xóa index không dùng.
 5. Thiếu index cho foreign key. PostgreSQL không tự tạo, còn MySQL InnoDB thì có.
 6. Bỏ qua NULL; partial index có thể giúp.
-7. Không kiểm tra index có được dùng hay không (xem system view của PostgreSQL, MySQL, SQL Server).
+7. Không kiểm tra index có được dùng hay không (xem system view của PostgreSQL, MySQL).
 
 ### 8. Kiểm tra bằng EXPLAIN
-- PostgreSQL: `EXPLAIN ANALYZE`; MySQL: `EXPLAIN`; SQL Server: actual execution plan và `SET STATISTICS IO ON`.
+- `EXPLAIN`: cho kế hoạch dự đoán, không chạy query; dùng để biết index có được dùng hay không (PostgreSQL và MySQL đều có).
+- `EXPLAIN ANALYZE`: chạy query thật, cho số dòng và thời gian thực tế (PostgreSQL; MySQL từ 8.0.18). Cẩn thận với INSERT, UPDATE, DELETE.
+- Đọc kết quả: PostgreSQL xem Index Scan / Index Only Scan so với Seq Scan; MySQL xem cột `key` và `type` (`ALL` là quét toàn bảng).
 - Test với lượng dữ liệu thực tế, vì optimizer chọn plan khác nhau tùy kích thước bảng.
 
 ### 9. Bảo trì index

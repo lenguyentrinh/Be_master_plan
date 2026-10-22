@@ -135,12 +135,14 @@ CREATE INDEX idx_locations_coords    ON locations USING gist (coordinates);
 ```
 
 ```sql
--- 7. Clustered (SQL Server): quy định thứ tự vật lý, mỗi bảng chỉ 1
-CREATE CLUSTERED INDEX cix_orders_id ON orders (id);
--- 8. Non-clustered: cấu trúc riêng trỏ về dòng dữ liệu, có thể có nhiều
-CREATE NONCLUSTERED INDEX ix_orders_customer ON orders (customer_id);
+-- 7. Clustered: quy định thứ tự vật lý, mỗi bảng chỉ 1
+-- MySQL (InnoDB): primary key chính là clustered index
+CREATE TABLE orders (id BIGINT PRIMARY KEY, customer_id INT);
 -- PostgreSQL không có clustered index thực sự; CLUSTER chỉ sắp xếp lại bảng một lần
 CLUSTER orders USING idx_orders_customer;
+
+-- 8. Non-clustered (MySQL gọi là secondary index): cấu trúc riêng trỏ về dòng dữ liệu, có thể có nhiều
+CREATE INDEX idx_orders_customer ON orders (customer_id);
 ```
 
 ---
@@ -210,16 +212,11 @@ CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at);
 ## Slide 6: How Do I Know an Index Is Used?
 
 ```sql
--- PostgreSQL
-EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 500;
-
--- MySQL
+-- EXPLAIN: kế hoạch dự đoán, không chạy query (PostgreSQL và MySQL đều có)
 EXPLAIN SELECT * FROM orders WHERE customer_id = 500;
 
--- SQL Server
-SET STATISTICS IO ON;
-SELECT * FROM orders WHERE customer_id = 500;
--- bật "Include Actual Execution Plan" trong SSMS
+-- EXPLAIN ANALYZE: chạy query thật, cho số dòng và thời gian thực tế (PostgreSQL; MySQL từ 8.0.18)
+EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 500;
 ```
 
 Cách đọc plan (PostgreSQL), so sánh trước/sau khi `CREATE INDEX idx_orders_customer ON orders (customer_id)`:
@@ -227,6 +224,13 @@ Cách đọc plan (PostgreSQL), so sánh trước/sau khi `CREATE INDEX idx_orde
 ```text
 Trước:  Seq Scan on orders        Filter: (customer_id = 500)
 Sau:    Index Scan using idx_orders_customer on orders   Index Cond: (customer_id = 500)
+```
+
+Cách đọc kết quả (MySQL): nhìn cột `key` và `type`.
+
+```text
+Trước:  type = ALL     key = NULL                    (quét toàn bảng)
+Sau:    type = ref     key = idx_orders_customer     (có dùng index)
 ```
 
 Kiểm tra index có được dùng và bảo trì:
