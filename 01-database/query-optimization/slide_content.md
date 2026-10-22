@@ -4,6 +4,8 @@ Nội dung từng slide của deck Canva, nối tiếp phần Indexes (slide 1 �
 
 Deck: https://www.canva.com/design/DAHYhGFyqoI/DXfLNbB4reodOOOhBwBHPQ/edit
 
+Kiểu trình bày (theo `CLAUDE.md` mục 9): nền trắng có lưới xám nhạt, màu navy `#2C4877`, tiêu đề font Anton viết hoa, nội dung font Poppins, hình minh họa là khung bo tròn viền navy (cảnh báo dùng đỏ nhạt).
+
 | Slide | Câu hỏi cần trả lời | Mục trong README |
 |---|---|---|
 | 8 | Giới thiệu chủ đề và 5 phần sẽ trình bày | Toàn bộ README |
