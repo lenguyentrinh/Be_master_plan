@@ -1,4 +1,5 @@
 # BE Master Plan
+Link slide: https://www.canva.com/design/DAHYhGFyqoI/DXfLNbB4reodOOOhBwBHPQ/edit
 
 | Domain | Sub domain | Week | Notes |
 |---|---|---|---|
