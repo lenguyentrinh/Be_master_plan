@@ -72,6 +72,13 @@ EXPLAIN SELECT * FROM users WHERE province = 'province_01';                     
 EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND birth_date >= '1990-01-01';    -- uses the index (both columns)
 EXPLAIN SELECT * FROM users WHERE birth_date >= '1990-01-01' AND gender = 'F';                -- leading column `province` is missing: the composite index is NOT used
 
+-- 3 columns: index (a, b, c) = (province, status, gender)
+CREATE INDEX idx_users_abc ON users (province, status, gender);
+EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND status = 'alive' AND gender = 'F';   -- uses the index (a, b, c)
+EXPLAIN SELECT * FROM users WHERE status = 'alive';                                                 -- `b` alone: usually NOT used; PostgreSQL 18+ may use a skip scan because `province` has few distinct values
+EXPLAIN SELECT * FROM users WHERE gender = 'F';                                                     -- `c` alone: usually NOT used (PostgreSQL 18+ may also skip scan here)
+DROP INDEX idx_users_abc;                                                                           -- drop it so the next sections start clean
+
 -- 4. Partial: a working person must be alive, so index only the people who are alive
 CREATE INDEX idx_users_alive ON users (province, birth_date) WHERE status = 'alive';
 EXPLAIN SELECT * FROM users

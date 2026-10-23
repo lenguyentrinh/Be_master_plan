@@ -74,6 +74,13 @@ EXPLAIN SELECT * FROM users WHERE province = 'province_01';                     
 EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND birth_date >= '1990-01-01';    -- uses the index (both columns)
 EXPLAIN SELECT * FROM users WHERE birth_date >= '1990-01-01' AND gender = 'F';                -- leading column `province` is missing: idx_users_province_birth is NOT used
 
+-- 3 columns: index (a, b, c) = (province, status, gender)
+CREATE INDEX idx_users_abc ON users (province, status, gender);
+EXPLAIN SELECT * FROM users WHERE province = 'province_01' AND status = 'alive' AND gender = 'F';   -- uses the index (a, b, c)
+EXPLAIN SELECT * FROM users WHERE status = 'alive';                                                 -- `b` alone: NOT used
+EXPLAIN SELECT * FROM users WHERE gender = 'F';                                                     -- `c` alone: NOT used
+DROP INDEX idx_users_abc ON users;                                                                  -- drop it so the next sections start clean
+
 -- 4. Partial
 -- MySQL does NOT support partial indexes (CREATE INDEX has no WHERE clause). See demo_postgres.sql.
 

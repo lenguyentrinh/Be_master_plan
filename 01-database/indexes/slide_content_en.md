@@ -15,7 +15,7 @@ English version of `slide_content.md`, in simple and short words.
 
 **Notes:**
 
-Hi everyone. Today I will talk about indexes in a database. It takes about 15 minutes: 5 parts, then a Q&A. This is only an overview. If you have a question, write it down and ask it in the Q&A.
+Today I will talk about database indexes. It takes about 15 minutes: 5 parts, then a Q&A. This presentation covers the key points. If you have a question, please take note and ask it in the Q&A.
 
 1. What is an index?
 2. What is a B-tree?
@@ -29,26 +29,23 @@ Hi everyone. Today I will talk about indexes in a database. It takes about 15 mi
 
 **Notes:**
 
-First, what happens when a column has no index?
-
+First, without an index? what happens?
 - The database must read the whole table to find the data.
 - This is called a **full table scan**.
 
-An index fixes this:
-
-- It is an extra data structure.
-- It helps the database find the right rows without reading the whole table.
+with An index,searching is faster:
+- index helps the database find the right rows without reading the whole table. This is a **an extra structure**
 
 But there is a trade-off:
 
-- Reads are **faster**, writes are **slower**. Every INSERT, UPDATE and DELETE must also update the index.
+- Reads are **faster**, writes are **slower**. Every INSERT, UPDATE and DELETE must also update the extra structure.
 - An index uses more memory and disk space.
 - So create indexes only when the table is big, or will grow.
 
 Next question: how does an index make search faster?
 
-- There are many kinds of index, for example inverted, B-tree and hash.
-- We will look at the B-tree, because it is the most common.
+- Different index types use different data structures. For example, a B-tree index uses a tree structure, a Hash index uses hashing, and a GIN index uses an inverted index structure.
+- For example, a B-tree index, which is the most common, uses a tree structure.
 
 ---
 
@@ -56,11 +53,11 @@ Next question: how does an index make search faster?
 
 **Notes:**
 
-- A B-tree is a tree. It is the default and most common index.
-- A search starts at the **root**, goes down through the middle nodes, and ends at a **leaf**.
-- Leaves are linked in order, so range search is fast too.
-- Real databases use a B+tree: the data is in the leaves, and the leaves are linked.
-
+- B-tree is a common type of index.
+- It helps the database find data quickly.
+- The search starts at the top and moves down the tree until it finds the data.
+- The data is stored at the bottom, and the leaves are linked together. This also makes range searches faster. 
+- 
 About the NOTE box on the slide:
 
 - An index can also use hash or inverted structures.
