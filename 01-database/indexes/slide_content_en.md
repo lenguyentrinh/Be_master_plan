@@ -38,30 +38,19 @@ with An index,searching is faster:
 
 But there is a trade-off:
 
-- Reads are **faster**, writes are **slower**. Every INSERT, UPDATE and DELETE must also update the extra structure.
-- An index uses more memory and disk space.
-- So create indexes only when the table is big, or will grow.
+- Reads are faster, but writes are slower because each change must update the index.
+- Indexes use extra space, so they’re useful for large tables that don’t change often. If a table changes a lot, we should be careful when adding indexes.
 
+## Slide 3: What is a B-tree?
+**Notes:**
 Next question: how does an index make search faster?
 
 - Different index types use different data structures. For example, a B-tree index uses a tree structure, a Hash index uses hashing, and a GIN index uses an inverted index structure.
-- For example, a B-tree index, which is the most common, uses a tree structure.
+For example, a B-tree index is the most common type of index. It uses a tree structure, where the index keeps the data in order.
 
----
-
-## Slide 3: What is a B-tree?
-
-**Notes:**
-
-- B-tree is a common type of index.
-- It helps the database find data quickly.
-- The search starts at the top and moves down the tree until it finds the data.
-- The data is stored at the bottom, and the leaves are linked together. This also makes range searches faster. 
-- 
-About the NOTE box on the slide:
-
-- An index can also use hash or inverted structures.
-- Today we only look at the B-tree.
+- This helps the database find data quickly without scanning the whole table.
+- The search starts at the top and moves down the tree to find the data.
+-And because the leaf nodes are linked together, range searches are faster
 
 ---
 
@@ -69,10 +58,9 @@ About the NOTE box on the slide:
 
 **Notes:**
 
-There are **8 main types**. Let's go one by one.
+There are **8 main types**. Such as: B-tree, Unique, Full-text/Gin, Partial,Covering, Clustered, Non-clustered
 
 ### 1. B-tree
-
 - This is the default index.
 - It works for equality, range, ORDER BY, and prefix search like `LIKE 'abc%'`.
 - It does not work for `LIKE '%abc'`, because the wildcard is at the start.
@@ -80,15 +68,12 @@ There are **8 main types**. Let's go one by one.
 - `[PostgreSQL]` needs the `text_pattern_ops` operator class (or "C" collation) for `LIKE 'abc%'`.
 - If many rows have the same key, the database finds the key, then reads the next leaf nodes.
 
-### 2. Unique
-
-- A B-tree with one more rule: no duplicate values.
-- It cannot be created if the column already has duplicates.
-- Once created, it blocks every new duplicate.
-- NULL values can usually repeat.
+### 2. Unique index: It also uses a B-tree structure, but with one extra rule: duplicate values are not allowed.
+- If the column already has duplicate values, we cannot create the index.
+- Once it's created, it prevents new duplicates.
+- And in some databases, NULL values can still repeat.
 
 ### 3. Composite
-
 - An index on several columns. It follows the **leftmost prefix** rule.
 - Example: index `(a, b, c)`
   - It works for `a`, `(a, b)` and `(a, b, c)`.
@@ -99,7 +84,7 @@ There are **8 main types**. Let's go one by one.
   - Among equality columns, put the most selective column first (a rule of thumb, not a law).
   - Columns after a range column cannot help the search.
 
-### 4. Full-text
+### 4. Full-text/Gin
 
 - It is for searching text, when `LIKE` with a leading wildcard cannot use an index.
 - `[MySQL]` uses a `FULLTEXT` index.
@@ -126,7 +111,7 @@ There are **8 main types**. Let's go one by one.
 
 ### 8. Non-clustered
 
-- A separate structure that points to the rows. A table can have many.
+- A extra structure that points to physical rows in the table. A table can have many.
 - MySQL calls it a secondary index.
 
 ---
