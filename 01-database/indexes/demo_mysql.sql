@@ -86,7 +86,7 @@ DROP INDEX idx_users_abc ON users;                                              
 
 -- 5. Full-text: search inside `bio`
 CREATE FULLTEXT INDEX idx_users_bio ON users (bio);
-SELECT COUNT(*) FROM users WHERE MATCH(bio) AGAINST('database design');                      -- case 1: both words must appear, but not necessarily next to each other
+SELECT COUNT(*) FROM users WHERE MATCH(bio) AGAINST('database design');                      -- case 1: natural language mode, rows with at least one of the words (OR), words need not be next to each other
 SELECT COUNT(*) FROM users WHERE MATCH(bio) AGAINST('"database design"' IN BOOLEAN MODE);    -- case 2: the exact phrase, words next to each other
 
 -- GIN / GiST exist only in PostgreSQL. See demo_postgres.sql.

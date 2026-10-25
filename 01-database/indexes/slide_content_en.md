@@ -158,5 +158,5 @@ How to read the result:
 
 Notes:
 
-- `EXPLAIN ANALYZE` runs the query for real. Be careful with INSERT, UPDATE and DELETE (you can wrap them in a transaction and roll back).
+- `EXPLAIN ANALYZE` runs the query for real. Be careful with INSERT, UPDATE and DELETE 
 - EXPLAIN is a big topic. Today we only cover the basics.
