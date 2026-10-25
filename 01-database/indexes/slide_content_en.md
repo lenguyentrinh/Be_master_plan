@@ -1,6 +1,6 @@
 ## Slide 1: Indexes
 **Notes:**
-Today I will talk about database indexes. It takes about 15 minutes: 5 parts, then a Q&A. This presentation covers the key points. If you have a question, please take note and ask it in the Q&A.
+Today I will talk about database indexes. It takes about 15 minutes: 5 parts, then a Q&A. This presentation covers the key points. If you have a any question, you can me during each slide.
 
 ## Slide 2: What is an Index?
 **Notes:**
@@ -63,7 +63,7 @@ There are **8 main types**. Such as: B-tree, Unique, Full-text/Gin, Partial,Cove
 - `[MySQL]` has no `INCLUDE`. Put the extra columns in a composite index.
 
 ### 7. Clustered
-- It sets the physical order of the rows, so a table has only one.
+- It determines the physical order of the rows, so a table has only one.
 - `[MySQL]` InnoDB uses the primary key as the clustered index.
 - `[PostgreSQL]` has no real clustered index. The `CLUSTER` command only sorts the table once.
 
