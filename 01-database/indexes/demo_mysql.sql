@@ -85,7 +85,7 @@ DROP INDEX idx_users_abc ON users;                                              
 -- MySQL does NOT support partial indexes (CREATE INDEX has no WHERE clause). See demo_postgres.sql.
 
 -- 5. Full-text: search inside `bio`
-CREATE FULLTEXT INDEX idx_users_bio ON users (bio);
+CREATE FULLTEXT INDEX idx_users_bio ON users (bio); --wildcard in first LIKE "%abc"
 SELECT COUNT(*) FROM users WHERE MATCH(bio) AGAINST('database design');                      -- case 1: natural language mode, rows with at least one of the words (OR), words need not be next to each other
 SELECT COUNT(*) FROM users WHERE MATCH(bio) AGAINST('"database design"' IN BOOLEAN MODE);    -- case 2: the exact phrase, words next to each other
 
