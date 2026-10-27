@@ -18,7 +18,7 @@
 
 | Loại | Dùng khi | Lưu ý |
 |---|---|---|
-| **B-tree** (mặc định) | So sánh bằng (`email = 'alice@example.com'`), range (`age BETWEEN 10 AND 20`), sort (`ORDER BY email LIMIT 10`), `LIKE 'abc%'` (prefix) | Không dùng được cho `LIKE '%abc'` (wildcard đứng đầu) |
+| **B-tree** (mặc định) | So sánh bằng (`email = 'alice@example.com'`), range (`age BETWEEN 10 AND 20`), sort (`ORDER BY email LIMIT 10`), `LIKE 'abc%'` (prefix) | Không dùng được cho `LIKE '%abc'` (wildcard đứng đầu). `LIKE 'abc%'`: MySQL dùng index trực tiếp; PostgreSQL cần operator class `text_pattern_ops` (hoặc collation "C") |
 | **Unique** | Chống trùng giá trị | Primary key tự tạo unique index |
 | **Composite** (nhiều cột) | Query lọc/sắp xếp theo nhiều cột | Thứ tự cột quan trọng, theo quy tắc *leftmost prefix* |
 | **Partial** | Chỉ cần index một phần dòng (`WHERE ...`) | PostgreSQL hỗ trợ; MySQL không hỗ trợ; index nhỏ hơn |
@@ -75,8 +75,8 @@ CREATE INDEX idx_orders_cover ON orders (customer_id) INCLUDE (total, status);
 
 ### 3. Thứ tự cột trong composite index
 - Đặt các cột so sánh **bằng (equality)** trước, rồi tới cột **range** đầu tiên. Cột đứng sau điều kiện range không dùng được index.
-- Giữa các cột equality, đặt cột có độ chọn lọc (selectivity) cao nhất trước.
-- Leftmost prefix: index `(a, b, c)` dùng được cho `a`, `a,b`, `a,b,c` nhưng không dùng được cho riêng `b` hoặc `c`.
+- Giữa các cột equality, đặt cột có độ chọn lọc (selectivity) cao nhất trước (quy tắc kinh nghiệm, không phải luật tuyệt đối).
+- Leftmost prefix: index `(a, b, c)` dùng được cho `a`, `a,b`, `a,b,c` nhưng thường không dùng được cho riêng `b` hoặc `c` (PostgreSQL 18+ đôi khi làm được nhờ skip scan).
 
 ### 4. Covering index
 - Nên dùng cho query chạy thường xuyên như dashboard, API endpoint, vì tránh phải quay lại đọc bảng.
