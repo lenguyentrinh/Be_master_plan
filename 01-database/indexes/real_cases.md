@@ -1,4 +1,4 @@
-Giả sử mình có một hệ thống bán hàng khá lớn, khoảng 100 000 user. Ngoài user ra thì hệ thống còn có thêm các bảng product, order và order_item.
+Giả sử mình có một hệ thống bán hàng khá lớn, khoảng 100 000 user. Ngoài user ra thì hệ thống còn có thêm các bảng product, order và order_item. 
 
 Các bảng mình dùng làm ví dụ sẽ có những cột như sau:
 Bảng user: userid, email, pwd.
@@ -56,7 +56,15 @@ SELECT userid, pwd FROM users WHERE email = 'alice@example.com';
 ```sql
 CREATE UNIQUE INDEX idx_users_email ON users (email);
 ```
-**Vì sao chỉ cần một cột:** vì mình chỉ đi tìm đúng một giá trị là email thôi. Không có điều kiện nào khác đi kèm, nên không cần composite.
+**Vì sao không dùng unique index, composite hay covering index?**
+
+- **Unique index** thì thực ra cũng là B-tree bên dưới, chỉ khác là có thêm ràng buộc không cho trùng. Trong thực tế, developer thường thêm `UNIQUE` constraint vào `email` ngay lúc thiết kế bảng — vì email đương nhiên không được trùng. Khi đó DB **đã tự tạo một B-tree index rồi**. Sau này khi hệ thống lớn cần tối ưu, mình không cần tạo thêm gì — index đã có sẵn từ trước rồi.
+
+- **Composite index** thì không cần, vì trong query đăng nhập chỉ có đúng một điều kiện là `email = ?`, không có cột nào khác đi kèm. Thêm cột vào index lúc này chỉ tốn bộ nhớ, không mang lại lợi ích gì.
+
+- **Covering index** thì cũng không cần. Covering index có nghĩa là index chứa luôn các cột cần SELECT để DB không phải quay lại bảng gốc. Nhưng ở đây mình chỉ cần `email` để lọc, còn `userid` và `pwd` thì bảng `users` nhỏ, chi phí đọc thêm từ bảng gốc rất thấp — không đáng để tạo thêm cột vào index.
+
+**Kết luận:** B-tree index đơn giản trên `email` là đủ. Và nếu đã có `UNIQUE` constraint từ lúc thiết kế bảng thì index đó đã tồn tại rồi — không cần tạo thêm.
 
 # Phần 2: Case thường gặp dùng composite
 ## Case 2 (phổ biến nhất). Trang "Đơn hàng của tôi"
