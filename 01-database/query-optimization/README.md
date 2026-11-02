@@ -3,10 +3,84 @@
 - **Domain:** Database
 - **Week:** Week 1-4
 
+## Mục lục
+- [Reference](#reference)
+- [Key concepts](#key-concepts)
+  1. [Dùng index đúng cách](#1-dùng-index-đúng-cách-use-proper-indexing)
+  2. [Tránh `SELECT *`](#2-tránh-select--avoid-select-)
+  3. [Tránh lấy dữ liệu thừa](#3-tránh-lấy-dữ-liệu-thừa-avoid-redundant-or-unnecessary-data-retrieval)
+  4. [Dùng JOIN hiệu quả](#4-dùng-join-hiệu-quả-use-joins-efficiently)
+  5. [Phân tích execution plan](#5-phân-tích-execution-plan-analyze-query-execution-plans)
+  6. [Tối ưu mệnh đề `WHERE`](#6-tối-ưu-mệnh-đề-where-optimize-where-clauses)
+  7. [Tối ưu subquery](#7-tối-ưu-subquery-optimize-subqueries)
+  8. [Dùng `EXISTS` thay `IN`](#8-dùng-exists-thay-in-cho-subquery-use-exists-instead-of-in)
+  9. [Hạn chế `DISTINCT`](#9-hạn-chế-distinct-limit-the-use-of-distinct)
+  10. [Tính năng riêng của DB](#10-tính-năng-riêng-của-db-leverage-database-specific-features)
+  11. [Theo dõi và cập nhật statistics](#11-theo-dõi-và-cập-nhật-statistics-monitor-and-optimize-database-statistics)
+  12. [Dùng stored procedure](#12-dùng-stored-procedure-utilize-stored-procedures)
+  13. [Tránh `ORDER BY` / `GROUP BY` không cần thiết](#13-tránh-order-by--group-by-không-cần-thiết-avoid-unnecessary-ordering-and-grouping)
+  14. [`UNION ALL` thay `UNION`](#14-union-all-thay-union-use-union-all-instead-of-union)
+  15. [Chia nhỏ query phức tạp](#15-chia-nhỏ-query-phức-tạp-break-down-complex-queries)
+- [Q&A](#qa)
+- [Hands-on](#hands-on)
+- [Done](#done)
+- [Slide](#slide)
+
 ## Reference
 - [SQL Query Optimization: 15 Techniques for Better Performance | DataCamp](https://www.datacamp.com/blog/sql-query-optimization)
 
 ## Key concepts
+**Correlated subquery** là một subquery bên trong tham chiếu đến cột của query bên ngoài. Vì vậy nó phụ thuộc vào từng dòng của query ngoài và không chạy độc lập được. Về mặt logic, nó được tính lại cho mỗi dòng mà query ngoài đang xét.
+
+**Derived table** là subquery đặt trong mệnh đề `FROM`, kèm alias bắt buộc, và được dùng như một bảng tạm trong lúc query chạy (giống CTE).
+
+Ví dụ **correlated subquery**: subquery dùng `o.customer_id` của query ngoài nên chạy lại cho từng dòng.
+
+```sql
+-- Đơn có total lớn hơn trung bình đơn của chính khách hàng đó
+SELECT o.order_id, o.customer_id, o.total
+FROM orders o
+WHERE o.total > (
+    SELECT AVG(o2.total)
+    FROM orders o2
+    WHERE o2.customer_id = o.customer_id   -- tham chiếu cột của query ngoài
+);
+```
+
+Ví dụ **uncorrelated subquery** để so sánh: không tham chiếu query ngoài nên chỉ chạy một lần.
+
+```sql
+-- Đơn có total lớn hơn trung bình của toàn bộ đơn
+SELECT order_id, total
+FROM orders
+WHERE total > (SELECT AVG(total) FROM orders);
+```
+
+Ví dụ **derived table**: tính tổng một lần ở `FROM`, rồi lọc ở query ngoài (alias `t` là bắt buộc).
+
+```sql
+-- Khách có tổng chi tiêu trên 10 triệu
+SELECT t.customer_id, t.total_spent
+FROM (
+    SELECT customer_id, SUM(total) AS total_spent
+    FROM orders
+    GROUP BY customer_id
+) AS t
+WHERE t.total_spent > 10000000;
+```
+
+Cách gỡ correlated subquery bằng derived table: tính trung bình theo nhóm một lần rồi `JOIN`.
+
+```sql
+SELECT o.order_id, o.customer_id, o.total
+FROM orders o
+JOIN (
+    SELECT customer_id, AVG(total) AS avg_total
+    FROM orders
+    GROUP BY customer_id
+) AS a ON a.customer_id = o.customer_id
+WHERE o.total > a.avg_total;
+```
 
 ### 1. Dùng index đúng cách (Use Proper Indexing)
 - **Index:** đánh index cột hay dùng để lọc/join, tránh full scan. Đánh đổi: ghi chậm hơn, nên không đánh quá nhiều.
