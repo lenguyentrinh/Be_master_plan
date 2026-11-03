@@ -4,27 +4,29 @@
 - **Week:** Week 1-4
 
 ## Mục lục
-- [Reference](#reference)
-- [Key concepts](#key-concepts)
-  1. [Dùng index đúng cách](#1-dùng-index-đúng-cách-use-proper-indexing)
-  2. [Tránh `SELECT *`](#2-tránh-select--avoid-select-)
-  3. [Tránh lấy dữ liệu thừa](#3-tránh-lấy-dữ-liệu-thừa-avoid-redundant-or-unnecessary-data-retrieval)
-  4. [Dùng JOIN hiệu quả](#4-dùng-join-hiệu-quả-use-joins-efficiently)
-  5. [Phân tích execution plan](#5-phân-tích-execution-plan-analyze-query-execution-plans)
-  6. [Tối ưu mệnh đề `WHERE`](#6-tối-ưu-mệnh-đề-where-optimize-where-clauses)
-  7. [Tối ưu subquery](#7-tối-ưu-subquery-optimize-subqueries)
-  8. [Dùng `EXISTS` thay `IN`](#8-dùng-exists-thay-in-cho-subquery-use-exists-instead-of-in)
-  9. [Hạn chế `DISTINCT`](#9-hạn-chế-distinct-limit-the-use-of-distinct)
-  10. [Tính năng riêng của DB](#10-tính-năng-riêng-của-db-leverage-database-specific-features)
-  11. [Theo dõi và cập nhật statistics](#11-theo-dõi-và-cập-nhật-statistics-monitor-and-optimize-database-statistics)
-  12. [Dùng stored procedure](#12-dùng-stored-procedure-utilize-stored-procedures)
-  13. [Tránh `ORDER BY` / `GROUP BY` không cần thiết](#13-tránh-order-by--group-by-không-cần-thiết-avoid-unnecessary-ordering-and-grouping)
-  14. [`UNION ALL` thay `UNION`](#14-union-all-thay-union-use-union-all-instead-of-union)
-  15. [Chia nhỏ query phức tạp](#15-chia-nhỏ-query-phức-tạp-break-down-complex-queries)
-- [Q&A](#qa)
-- [Hands-on](#hands-on)
-- [Done](#done)
-- [Slide](#slide)
+- [Query optimization](#query-optimization)
+  - [Mục lục](#mục-lục)
+  - [Reference](#reference)
+  - [Key concepts](#key-concepts)
+    - [1. Dùng index đúng cách (Use Proper Indexing)](#1-dùng-index-đúng-cách-use-proper-indexing)
+    - [2. Tránh `SELECT *` (Avoid SELECT \*)](#2-tránh-select--avoid-select-)
+    - [3. Tránh lấy dữ liệu thừa (Avoid Redundant or Unnecessary Data Retrieval)](#3-tránh-lấy-dữ-liệu-thừa-avoid-redundant-or-unnecessary-data-retrieval)
+    - [4. Dùng JOIN hiệu quả (Use Joins Efficiently)](#4-dùng-join-hiệu-quả-use-joins-efficiently)
+    - [5. Phân tích execution plan (Analyze Query Execution Plans)](#5-phân-tích-execution-plan-analyze-query-execution-plans)
+    - [6. Tối ưu mệnh đề `WHERE` (Optimize WHERE Clauses)](#6-tối-ưu-mệnh-đề-where-optimize-where-clauses)
+    - [7. Tối ưu subquery (Optimize Subqueries)](#7-tối-ưu-subquery-optimize-subqueries)
+    - [8. Dùng `EXISTS` thay `IN` cho subquery (Use EXISTS Instead of IN)](#8-dùng-exists-thay-in-cho-subquery-use-exists-instead-of-in)
+    - [9. Hạn chế `DISTINCT` (Limit the use of DISTINCT)](#9-hạn-chế-distinct-limit-the-use-of-distinct)
+    - [10. Tính năng riêng của DB (Leverage Database-Specific Features)](#10-tính-năng-riêng-của-db-leverage-database-specific-features)
+    - [11. Theo dõi và cập nhật statistics (Monitor and Optimize Database Statistics)](#11-theo-dõi-và-cập-nhật-statistics-monitor-and-optimize-database-statistics)
+    - [12. Dùng stored procedure (Utilize stored procedures)](#12-dùng-stored-procedure-utilize-stored-procedures)
+    - [13. Tránh `ORDER BY` / `GROUP BY` không cần thiết (Avoid Unnecessary Ordering and Grouping)](#13-tránh-order-by--group-by-không-cần-thiết-avoid-unnecessary-ordering-and-grouping)
+    - [14. `UNION ALL` thay `UNION` (Use UNION ALL Instead of UNION)](#14-union-all-thay-union-use-union-all-instead-of-union)
+    - [15. Chia nhỏ query phức tạp (Break Down Complex Queries)](#15-chia-nhỏ-query-phức-tạp-break-down-complex-queries)
+  - [Q\&A](#qa)
+  - [Hands-on](#hands-on)
+  - [Done](#done)
+  - [Slide](#slide)
 
 ## Reference
 - [SQL Query Optimization: 15 Techniques for Better Performance | DataCamp](https://www.datacamp.com/blog/sql-query-optimization)
@@ -214,7 +216,20 @@ WHERE EXISTS (SELECT 1 FROM customers c WHERE c.customer_id = o.customer_id AND 
 
 ### 9. Hạn chế `DISTINCT` (Limit the use of DISTINCT)
 - **`DISTINCT`:** hạn chế; khử trùng lặp từ lúc làm sạch dữ liệu, hoặc dùng `GROUP BY` / window function (`ROW_NUMBER`).
-  - `DISTINCT` tốn tài nguyên với dữ liệu lớn. `GROUP BY` có thể hiệu quả hơn, nhất là khi có aggregate: `SELECT DISTINCT city FROM customers;` thành `SELECT city FROM customers GROUP BY city;`.
+  - `DISTINCT` tốn tài nguyên với dữ liệu lớn vì phải loại trùng. Chỉ đổi `DISTINCT` thành `GROUP BY` thì thường **không nhanh hơn** (optimizer hay cho cùng plan); `GROUP BY` có lợi khi cần aggregate (`COUNT`, `SUM`) vì làm cả hai việc trong một lượt quét.
+  - Dùng `DISTINCT` để che dòng trùng do `JOIN` là dấu hiệu xấu; nên sửa tận gốc (dùng `EXISTS`, hoặc gom nhóm trước khi `JOIN`).
+
+```sql
+-- Không tốt: JOIN sinh dòng trùng (1 khách nhiều đơn) rồi dùng DISTINCT để che
+SELECT DISTINCT c.id, c.name
+FROM customers c JOIN orders o ON o.customer_id = c.id;
+-- Tốt hơn: chỉ cần biết khách có đơn hay không thì dùng EXISTS, không sinh dòng trùng
+SELECT c.id, c.name FROM customers c
+WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id);
+
+-- Cần aggregate thì GROUP BY làm gọn trong một lượt (DISTINCT không đếm được)
+SELECT city, COUNT(*) AS customer_count FROM customers GROUP BY city;
+```
 
 ### 10. Tính năng riêng của DB (Leverage Database-Specific Features)
 - **Query hint:** ép optimizer dùng cách cụ thể (`USE INDEX` của MySQL, `OPTION (LOOP JOIN)` của SQL Server); dùng thận trọng.
@@ -232,8 +247,6 @@ OPTION (LOOP JOIN);                                                    -- SQL Se
 
 ### 11. Theo dõi và cập nhật statistics (Monitor and Optimize Database Statistics)
 - Optimizer chọn plan dựa trên **statistics**; statistics cũ thì plan tệ. Cập nhật bằng `ANALYZE` (PostgreSQL) hoặc `UPDATE STATISTICS` (SQL Server).
-- Cập nhật tự động: SQL Server tự cập nhật khi dữ liệu đổi nhiều; PostgreSQL có auto-analyze chạy khi số thay đổi vượt ngưỡng.
-- Cập nhật thủ công: `ANALYZE;` (tất cả bảng) hoặc `ANALYZE my_table;` (PostgreSQL); `UPDATE STATISTICS` cho bảng hoặc index (SQL Server).
 - Statistics là thông tin về phân bố dữ liệu (số dòng, tần suất giá trị, độ trải). Statistics cũ có thể khiến optimizer chọn full table scan trong khi index scan nhanh hơn.
 
 ```sql
@@ -285,7 +298,9 @@ SELECT product_id FROM products WHERE category = 'Books';
 ```
 
 ### 15. Chia nhỏ query phức tạp (Break Down Complex Queries)
-- **Chia nhỏ query phức tạp:** tách thành nhiều bước; dùng **materialized view** lưu sẵn kết quả (cần refresh khi dữ liệu gốc đổi).
+- **Chia nhỏ query phức tạp:** tách thành nhiều bước; dùng **materialized view** lưu sẵn kết quả.
+  - **Materialized view** giống một bảng lưu sẵn kết quả của một câu `SELECT` phức tạp. Khi dữ liệu gốc thay đổi, nó **không tự cập nhật ngay**; cần chạy `REFRESH MATERIALIZED VIEW` để cập nhật.
+  - Bản chất: lưu kết quả để truy vấn nhanh hơn, đổi lại phải refresh khi dữ liệu thay đổi.
 
 ```sql
 CREATE MATERIALIZED VIEW daily_revenue AS
