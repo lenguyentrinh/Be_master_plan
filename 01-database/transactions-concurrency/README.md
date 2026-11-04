@@ -3,6 +3,40 @@
 - **Domain:** Database
 - **Week:** Week 1-4
 
+## Mục lục
+- [Transactions \& Concurrency](#transactions--concurrency)
+  - [Mục lục](#mục-lục)
+  - [Mục tiêu](#mục-tiêu)
+  - [Reference](#reference)
+  - [Key concepts](#key-concepts)
+    - [1. Transaction và ACID](#1-transaction-và-acid)
+    - [2. Các vấn đề khi transaction chạy đồng thời](#2-các-vấn-đề-khi-transaction-chạy-đồng-thời)
+    - [3. Lock-based concurrency control](#3-lock-based-concurrency-control)
+      - [Two-phase locking (2PL)](#two-phase-locking-2pl)
+    - [4. MVCC](#4-mvcc)
+      - [Snapshot isolation và write skew](#snapshot-isolation-và-write-skew)
+    - [5. Pessimistic và optimistic concurrency control](#5-pessimistic-và-optimistic-concurrency-control)
+      - [Pessimistic control](#pessimistic-control)
+      - [Optimistic control](#optimistic-control)
+    - [6. Isolation levels](#6-isolation-levels)
+      - [Bảng bổ sung: lost update và write skew](#bảng-bổ-sung-lost-update-và-write-skew)
+      - [Khác biệt theo DBMS](#khác-biệt-theo-dbms)
+    - [7. Deadlock](#7-deadlock)
+    - [8. Chọn cơ chế theo workload](#8-chọn-cơ-chế-theo-workload)
+    - [9. Bổ sung: ETL và Delta Live Tables](#9-bổ-sung-etl-và-delta-live-tables)
+  - [Q\&A](#qa)
+    - [Vì sao cần concurrency control?](#vì-sao-cần-concurrency-control)
+    - [MVCC có phải là không dùng lock không?](#mvcc-có-phải-là-không-dùng-lock-không)
+    - [Vì sao không dùng `Serializable` cho mọi transaction?](#vì-sao-không-dùng-serializable-cho-mọi-transaction)
+    - [Khi gặp deadlock, nên retry hay sửa query?](#khi-gặp-deadlock-nên-retry-hay-sửa-query)
+  - [Hands-on](#hands-on)
+    - [Bài 1: Quan sát lost update](#bài-1-quan-sát-lost-update)
+    - [Bài 2: Thử row lock](#bài-2-thử-row-lock)
+    - [Bài 3: Thử isolation level](#bài-3-thử-isolation-level)
+    - [Bài 4: Tạo và xử lý deadlock](#bài-4-tạo-và-xử-lý-deadlock)
+  - [Done](#done)
+  - [Slide](#slide)
+
 ## Mục tiêu
 
 Hiểu cách database xử lý nhiều transaction cùng lúc mà vẫn giữ dữ liệu đúng và nhất quán. Sau phần này cần giải thích được:
@@ -201,6 +235,23 @@ Với hệ thống phân tán và analytics, bài reference nêu thêm:
 - **Distributed MVCC với timestamp toàn cục:** ví dụ Google Spanner dùng TrueTime.
 - **Consensus (Raft, Paxos):** để các node thống nhất thứ tự commit.
 - **Lakehouse (Delta Lake):** dùng optimistic concurrency control và MVCC không khóa; các writer không xung đột đều commit được, còn xung đột thì retry hoặc tự giải quyết.
+
+### 9. Bổ sung: ETL và Delta Live Tables
+
+Tham khảo thêm: [What is Extract Transform Load (ETL)? | Databricks](https://www.databricks.com/blog/what-is-extract-transform-load)
+
+**ETL (Extract - Transform - Load)** là quy trình lấy dữ liệu từ nhiều nguồn, chuyển về định dạng thống nhất rồi nạp vào nơi lưu trữ đích (data warehouse hoặc lakehouse) để dùng cho analytics, data science, machine learning.
+
+- **Extract:** lấy dữ liệu từ nhiều nguồn (database giao dịch, API, log JSON, cảm biến...). Có ba cách: nguồn tự báo bản ghi thay đổi, nguồn xuất được các bản ghi đã đổi, hoặc lấy toàn bộ rồi so với bản trích xuất trước.
+- **Transform:** làm sạch, ánh xạ, định hình lại theo schema đích. Thường đưa qua **staging** trước khi nạp để dễ rollback, audit và tìm lỗi dữ liệu.
+- **Load:** ghi dữ liệu đã biến đổi từ staging vào database đích.
+- **ETL pipeline:** cơ chế tự động hóa cả ba bước trên.
+- **Thách thức:** pipeline viết tay phức tạp và khó tái sử dụng, khó giữ chất lượng dữ liệu, tốn công vận hành hạ tầng, khó truy vết lỗi.
+
+**Delta Live Tables (DLT)** là dịch vụ trong nền tảng Databricks giúp xây ETL pipeline theo kiểu **khai báo** (declarative) trên Delta Lake: người dùng định nghĩa input và output, hệ thống lo phần chạy pipeline, kiểm thử tự động, giám sát và khả năng phục hồi. Ví dụ: đọc bảng `raw_sales`, loại bản ghi trùng, chuẩn hóa định dạng ngày, ghi ra bảng `clean_sales`.
+
+- DLT thay việc tự viết và vận hành công cụ pipeline, nhưng người dùng vẫn phải định nghĩa logic biến đổi (SQL hoặc Python).
+- Liên hệ với topic này: DLT chạy trên Delta Lake, nơi có sẵn cơ chế optimistic concurrency control và MVCC nêu ở trên để nhiều pipeline ghi cùng lúc mà dữ liệu vẫn nhất quán.
 
 ## Q&A
 
