@@ -6,11 +6,8 @@
 4. Mỗi topic present khoảng 15 phút nên deck chỉ 5 đến 6 slide, bám sát các mục trong `README.md` của topic đó, không thêm nội dung ngoài README.
 5. Deck phải trả lời được các câu hỏi cốt lõi của topic. Với `01-database/indexes`: index là gì, B-tree là gì, có mấy loại index, các lỗi thường gặp, làm sao biết index đang hoạt động (dùng `EXPLAIN` hoặc `EXPLAIN ANALYZE`).
 6. Hai mục Q&A và Hands-on trong README không làm slide.
-7. Chữ trên slide viết bằng tiếng Anh. Không cần speaker notes trên Canva; phần lời thuyết trình tiếng Việt của từng slide viết trong `slide_content.md`.
-8. Mỗi topic có thêm `slide_content.md` (nội dung từng slide kèm lời thuyết trình tiếng Việt) và `example.md` (mỗi slide một ví dụ); khi deck thay đổi phải cập nhật hai file này cho khớp.
-9. **Quy trình làm mỗi topic, theo đúng thứ tự:**
+7. Chữ trên slide viết bằng tiếng Anh. Không cần speaker notes trên Canva.
+8. **Quy trình làm mỗi topic, theo đúng thứ tự:**
    1. Đọc refer tham khảo, ghi note vào `README.md` của topic.
-   2. Tạo slide trên Canva (deck dùng chung, mỗi topic nối tiếp topic trước). Cả deck dùng chung một kiểu (theo mẫu Robotic Presentation nhưng không dùng hình robot): nền trắng có lưới xám nhạt, màu chủ đạo navy `#2C4877`, tiêu đề font Anton viết hoa cỡ 64 (slide tiêu đề cỡ 84), nội dung font Poppins cỡ 22 đến 24, hình minh họa dạng khung bo tròn viền navy (chỗ cần cảnh báo dùng đỏ nhạt). Bố cục từng slide được sáng tạo tự do, miễn người đọc dễ đọc. Mỗi slide có tiêu đề, gạch đầu dòng và hình minh họa; chỉ thêm ô ghi chú nhỏ trên slide khi thật cần (ví dụ ô NOTE hoặc chú thích màu theo DB: cam là MySQL, xanh ngọc là PostgreSQL, navy là dùng chung), phần còn lại để trong `slide_content.md`.
-   3. Sau khi slide xong mới thêm `example.md` và `slide_content.md` cho khớp với deck.
 
-10. **Mỗi khái niệm phải có ví dụ thực tế.** Khi present, mỗi loại index/khái niệm cần kèm một case thực tế (bảng, dữ liệu, query cụ thể trong nghiệp vụ như đơn hàng, người dùng) cho thấy vấn đề gặp phải, cách giải quyết, và kết quả trước/sau (ví dụ output `EXPLAIN`), để người nghe hiểu được ý, không chỉ có cú pháp. Case bổ sung viết ở file riêng của topic (ví dụ `real_cases.md`), không sửa text cũ trong `README.md`.
+9. **Mỗi khái niệm phải có ví dụ thực tế.** Khi present, mỗi loại index/khái niệm cần kèm một case thực tế (bảng, dữ liệu, query cụ thể trong nghiệp vụ như đơn hàng, người dùng) cho thấy vấn đề gặp phải, cách giải quyết, và kết quả trước/sau (ví dụ output `EXPLAIN`), để người nghe hiểu được ý, không chỉ có cú pháp. Case bổ sung viết ở file riêng của topic (ví dụ `real_cases.md`), không sửa text cũ trong `README.md`.

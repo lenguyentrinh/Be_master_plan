@@ -76,8 +76,11 @@ Concurrency control chủ yếu bảo vệ tính **Isolation**, đồng thời h
 
 Database dùng lock để ngăn các thao tác xung đột trên row, page hoặc table.
 
+Lock mode:
 - **Shared lock (S):** cho phép nhiều transaction cùng đọc dữ liệu.
 - **Exclusive lock (X):** chỉ một transaction được sửa dữ liệu; transaction khác phải chờ hoặc thất bại tùy cấu hình.
+
+Lock granularity:
 - **Row-level lock:** concurrency tốt hơn vì chỉ khóa dòng cần thiết, nhưng database phải quản lý nhiều lock hơn.
 - **Table-level lock:** quản lý đơn giản hơn nhưng có thể làm các transaction không liên quan phải chờ.
 
