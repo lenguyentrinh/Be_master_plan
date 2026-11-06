@@ -38,7 +38,6 @@
   - [Slide](#slide)
 
 ## Mục tiêu
-
 Hiểu cách database xử lý nhiều transaction cùng lúc mà vẫn giữ dữ liệu đúng và nhất quán. Sau phần này cần giải thích được:
 
 - Transaction và bốn tính chất ACID.
@@ -116,19 +115,47 @@ Biến thể **strict 2PL** giữ các lock quan trọng đến khi `COMMIT` ho�
 
 **MVCC (Multi-Version Concurrency Control)** lưu nhiều phiên bản của một dòng thay vì để việc đọc và ghi luôn chặn lẫn nhau.
 
+Ý tưởng đơn giản: khi `UPDATE`, database không ghi đè dòng cũ mà tạo thêm một phiên bản mới. Mỗi transaction chỉ nhìn thấy những phiên bản đã commit tại thời điểm nó lấy **snapshot** (ảnh chụp trạng thái dữ liệu).
+
 - Reader đọc phiên bản phù hợp với snapshot của transaction.
 - Writer tạo phiên bản mới thay vì ghi đè ngay phiên bản mà reader đang đọc.
 - Reader thường không chặn writer và writer thường không chặn reader.
-- Khi hai transaction cùng sửa một dòng, database phát hiện xung đột khi commit; một transaction có thể phải rollback và retry.
+- Khi hai transaction cùng sửa một dòng, chỉ một transaction được ghi tiếp; transaction còn lại phải chờ hoặc rollback rồi retry (chi tiết ở phần dưới).
+
+Ví dụ: bảng `accounts`, tài khoản 1 đang có `balance = 100`.
+
+| Thời điểm | Transaction A (đọc) | Transaction B (ghi) |
+|---|---|---|
+| t1 | `BEGIN` (lấy snapshot) | |
+| t2 | | `UPDATE accounts SET balance = 50 WHERE account_id = 1` rồi `COMMIT` |
+| t3 | `SELECT balance` trả về **100** | |
+
+A vẫn thấy 100 dù B đã commit 50, vì A đọc phiên bản cũ thuộc snapshot của mình. Cả hai không phải chờ nhau. Với cách khóa thông thường, A có thể phải chờ B (hoặc ngược lại).
 
 MVCC phù hợp với hệ thống nhiều thao tác đọc hoặc các transaction ít xung đột. Đổi lại, database phải lưu và dọn các phiên bản cũ; PostgreSQL chẳng hạn cần cơ chế `VACUUM` để thu hồi phiên bản không còn dùng.
 
 #### Snapshot isolation và write skew
 
 - **Snapshot isolation (SI):** mỗi transaction đọc từ một snapshot cố định lúc bắt đầu. SI chặn dirty read và non-repeatable read, nhưng **vẫn cho phép write skew**.
+- **Write skew là gì:** hai transaction cùng đọc một tập dữ liệu, rồi mỗi bên sửa một dòng **khác nhau**. Vì không sửa cùng dòng nên không có xung đột ghi, nhưng kết quả cuối vi phạm một quy tắc nghiệp vụ.
 - **Serializable snapshot isolation (SSI):** SI cộng thêm bước phát hiện các dependency nguy hiểm để chặn write skew, đổi lại có thêm overhead và transaction có thể bị abort. PostgreSQL dùng SSI cho mức `Serializable`.
+
+Ví dụ write skew: quy tắc "mỗi ca trực phải có ít nhất 1 bác sĩ". Bảng `on_call` đang có bác sĩ An và Bình cùng trực.
+
+| Thời điểm | Transaction A (An xin nghỉ) | Transaction B (Bình xin nghỉ) |
+|---|---|---|
+| t1 | `SELECT count(*) FROM on_call WHERE on_duty` trả về 2, đủ người nên được nghỉ | `SELECT count(*) ...` cũng trả về 2 |
+| t2 | `UPDATE on_call SET on_duty = false WHERE doctor = 'An'` | `UPDATE on_call SET on_duty = false WHERE doctor = 'Binh'` |
+| t3 | `COMMIT` | `COMMIT` |
+
+Hai `UPDATE` sửa hai dòng khác nhau nên SI cho cả hai commit. Kết quả: không còn ai trực. Ở mức `Serializable` (SSI), một trong hai transaction bị abort và phải retry.
+
+Cách database xử lý xung đột ghi (khi **cùng một dòng**):
+
 - **First committer wins:** với optimistic validation thuần (ví dụ Delta Lake), transaction commit trước thắng, transaction sau phải retry.
-- **Thực tế khác nhau theo DB:** PostgreSQL và MySQL/InnoDB không đợi tới lúc commit mới phát hiện xung đột ghi. Transaction ghi sau bị chặn ngay ở câu `UPDATE` cho đến khi transaction trước kết thúc. Sau đó, ở Read Committed (PostgreSQL) nó đọc lại dòng và ghi tiếp; ở Repeatable Read (PostgreSQL) nó nhận lỗi serialization failure (SQLSTATE `40001`) và phải retry.
+- **PostgreSQL và MySQL/InnoDB thực tế:** không đợi tới lúc commit mới phát hiện xung đột ghi. Transaction ghi sau bị chặn ngay ở câu `UPDATE` cho đến khi transaction trước kết thúc. Sau đó:
+  - Read Committed (PostgreSQL): nó đọc lại dòng mới nhất và ghi tiếp.
+  - Repeatable Read (PostgreSQL): nó nhận lỗi serialization failure (SQLSTATE `40001`) và phải retry.
 
 ### 5. Pessimistic và optimistic concurrency control
 
@@ -139,6 +166,7 @@ Giả định xung đột thường xảy ra nên khóa dữ liệu từ trướ
 - Phù hợp với hệ thống nhiều ghi, dữ liệu nóng và yêu cầu không được retry nhiều lần.
 - Ưu điểm: ngăn xung đột sớm.
 - Nhược điểm: blocking, giảm throughput và có nguy cơ deadlock.
+- Ví dụ: flash sale chỉ còn 1 sản phẩm. Dùng `SELECT stock FROM products WHERE product_id = 1 FOR UPDATE` để khóa dòng, người mua thứ hai phải chờ rồi thấy `stock = 0`, không bị bán lố.
 
 #### Optimistic control
 
@@ -147,12 +175,19 @@ Giả định xung đột hiếm nên cho transaction chạy trước, sau đó 
 - Phù hợp với hệ thống nhiều đọc, ít transaction cùng sửa một dữ liệu.
 - Ưu điểm: ít blocking, concurrency cao.
 - Nhược điểm: nếu xung đột thường xuyên, nhiều transaction phải rollback và retry, gây lãng phí công việc.
+- Ví dụ: người dùng sửa hồ sơ cá nhân. Bảng có cột `version`; câu cập nhật là `UPDATE users SET name = 'X', version = version + 1 WHERE user_id = 1 AND version = 5`. Nếu có người khác đã sửa trước (version đã thành 6), câu lệnh cập nhật 0 dòng, ứng dụng biết có xung đột và báo người dùng tải lại để thử lại.
 
 Trong thực tế có thể kết hợp cả hai: dùng MVCC cho các thao tác thông thường và dùng `SELECT ... FOR UPDATE` cho các dòng quan trọng hoặc dễ tranh chấp.
 
 ### 6. Isolation levels
 
 Isolation level quyết định transaction được phép nhìn thấy và chịu những vấn đề concurrency nào.
+
+Ba vấn đề trong bảng, hiểu ngắn gọn:
+
+- **Dirty read:** đọc dữ liệu mà transaction khác chưa commit (có thể bị rollback sau đó).
+- **Non-repeatable read:** trong cùng một transaction, đọc cùng một dòng hai lần nhưng ra giá trị khác nhau vì có transaction khác vừa commit.
+- **Phantom read:** trong cùng một transaction, chạy cùng một câu `SELECT ... WHERE` hai lần nhưng số dòng khác nhau vì có transaction khác vừa thêm hoặc xóa dòng.
 
 | Isolation level | Dirty read | Non-repeatable read | Phantom read | Đặc điểm |
 |---|---:|---:|---:|---|
@@ -210,6 +245,15 @@ Deadlock xảy ra khi các transaction chờ lock của nhau theo vòng tròn:
 Transaction A giữ row 1, chờ row 2
 Transaction B giữ row 2, chờ row 1
 ```
+
+Ví dụ: chuyển tiền giữa tài khoản 1 và 2 theo hai chiều ngược nhau cùng lúc.
+
+| Thời điểm | Transaction A (1 chuyển cho 2) | Transaction B (2 chuyển cho 1) |
+|---|---|---|
+| t1 | `UPDATE accounts SET balance = balance - 10 WHERE account_id = 1` (giữ lock dòng 1) | `UPDATE accounts SET balance = balance - 20 WHERE account_id = 2` (giữ lock dòng 2) |
+| t2 | `UPDATE accounts SET balance = balance + 10 WHERE account_id = 2` (chờ lock dòng 2) | `UPDATE accounts SET balance = balance + 20 WHERE account_id = 1` (chờ lock dòng 1) |
+
+Cả hai chờ nhau mãi. Cách giảm deadlock: luôn khóa các dòng theo cùng một thứ tự (ví dụ `account_id` nhỏ trước) và giữ transaction ngắn.
 
 Database thường phát hiện vòng chờ, chọn một transaction làm **victim**, rollback transaction đó và giải phóng lock để transaction còn lại tiếp tục.
 
