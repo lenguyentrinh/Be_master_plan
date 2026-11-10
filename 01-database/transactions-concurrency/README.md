@@ -23,8 +23,10 @@
     - [6. Isolation levels](#6-isolation-levels)
       - [Bảng bổ sung: lost update và write skew](#bảng-bổ-sung-lost-update-và-write-skew)
       - [Khác biệt theo DBMS](#khác-biệt-theo-dbms)
+      - [Bảng bổ sung: snapshot được lấy khi nào](#bảng-bổ-sung-snapshot-được-lấy-khi-nào)
     - [7. Deadlock](#7-deadlock)
     - [8. Chọn cơ chế theo workload](#8-chọn-cơ-chế-theo-workload)
+      - [Không có phương pháp hoàn hảo: mỗi cách đều có đánh đổi](#không-có-phương-pháp-hoàn-hảo-mỗi-cách-đều-có-đánh-đổi)
     - [9. Bổ sung: ETL và Delta Live Tables](#9-bổ-sung-etl-và-delta-live-tables)
   - [Q\&A](#qa)
     - [Vì sao cần concurrency control?](#vì-sao-cần-concurrency-control)
@@ -295,6 +297,20 @@ Bảng trên theo chuẩn SQL nên không có hai anomaly này. Thực tế:
 - **PostgreSQL:** `Read Uncommitted` chạy giống `Read Committed` nên không tái hiện được dirty read. `Repeatable Read` là snapshot isolation nên không có phantom, nhưng vẫn có write skew. `Serializable` dùng SSI.
 - **MySQL/InnoDB:** `Repeatable Read` chặn phantom với consistent read thường; với locking read (`FOR UPDATE`, `UPDATE`) dùng next-key lock. Có thể tái hiện dirty read ở `Read Uncommitted`.
 
+#### Bảng bổ sung: snapshot được lấy khi nào
+
+Bảng isolation level ở trên chỉ cho biết *kết quả* (hiện tượng nào có thể xảy ra). Bảng này cho biết *cơ chế* (vì sao ra kết quả đó), áp dụng cho DBMS dùng MVCC như PostgreSQL:
+
+| Isolation level | Snapshot lấy khi nào | Hệ quả |
+|---|---|---|
+| Read Committed | Mỗi câu lệnh lấy một snapshot mới | Hai lần đọc trong cùng transaction có thể ra khác nhau |
+| Repeatable Read | Chỉ lấy **một lần**, ở câu lệnh đầu tiên của transaction | Mọi lần đọc sau đó thấy cùng một snapshot |
+| Serializable | Như Repeatable Read, cộng bước kiểm tra xung đột (SSI) | Chặn cả write skew |
+
+Ví dụ ở Repeatable Read: A đọc `balance = 100`, B sửa thành 50 và commit, A đọc lại vẫn thấy 100 vì A dùng snapshot lấy lúc đầu. Ở Read Committed, lần đọc thứ hai của A thấy 50.
+
+Lưu ý: ở PostgreSQL, snapshot của Repeatable Read được lấy ở **câu lệnh đầu tiên** (ví dụ `SELECT` đầu tiên), không phải tại câu `BEGIN`. Bảng này không áp dụng cho DBMS dùng lock thay cho MVCC.
+
 ### 7. Deadlock
 
 Deadlock xảy ra khi các transaction chờ lock của nhau theo vòng tròn:
@@ -340,6 +356,36 @@ Với hệ thống phân tán và analytics, bài reference nêu thêm:
 - **Distributed MVCC với timestamp toàn cục:** ví dụ Google Spanner dùng TrueTime.
 - **Consensus (Raft, Paxos):** để các node thống nhất thứ tự commit.
 - **Lakehouse (Delta Lake):** dùng optimistic concurrency control và MVCC không khóa; các writer không xung đột đều commit được, còn xung đột thì retry hoặc tự giải quyết.
+
+#### Không có phương pháp hoàn hảo: mỗi cách đều có đánh đổi
+
+| Phương pháp | Được gì | Phải đánh đổi |
+|---|---|---|
+| Lock (pessimistic) | Chặn xung đột sớm, không phải retry | Chờ nhau, giảm throughput, nguy cơ deadlock |
+| MVCC | Đọc không chặn ghi | Có thể đọc dữ liệu cũ, tốn chỗ lưu bản cũ, cần dọn (`VACUUM`) |
+| Optimistic | Không khóa, chạy song song tốt | Xung đột nhiều thì rollback và retry nhiều |
+| Isolation level thấp | Nhanh, ít chờ | Cho phép nhiều hiện tượng (non-repeatable read, phantom...) |
+| Isolation level cao (`Serializable`) | Đúng tuyệt đối | Chậm hơn, transaction dễ bị abort |
+
+Hai trục đánh đổi chính:
+
+- **Đúng đắn so với hiệu năng:** càng chặt chẽ càng phải chờ hoặc retry nhiều.
+- **Mới nhất so với nhất quán:** snapshot cố định (Repeatable Read) thì nhất quán nhưng có thể cũ.
+
+Ví dụ "nhất quán nhưng có thể cũ": báo cáo cuối ngày tính tổng tiền đơn hàng rồi tổng số lượng hàng đã bán.
+
+- Read Committed: giữa hai câu `SELECT` có đơn mới được commit, nên tổng tiền tính theo 100 đơn còn số lượng tính theo 101 đơn, hai số không khớp.
+- Repeatable Read: cả hai câu dùng cùng một snapshot nên hai số khớp nhau, dù đơn mới chưa hiện.
+
+Khi đọc rồi quyết định ghi dựa trên giá trị cũ (ví dụ đọc `stock = 1` nhưng người khác đã mua mất):
+
+| Nhu cầu | Cách dùng |
+|---|---|
+| Luôn thấy dữ liệu mới nhất mỗi lần đọc | Read Committed |
+| Cần bản mới nhất của một dòng rồi sửa nó | `SELECT ... FOR UPDATE` (đọc bản mới nhất và khóa dòng) |
+| Cần đúng tuyệt đối, kể cả write skew | `Serializable` |
+
+Cách chọn theo nghiệp vụ: trừ kho hoặc trừ tiền thì chấp nhận chờ hoặc retry để đúng tuyệt đối; xem danh sách sản phẩm thì chấp nhận dữ liệu hơi cũ để nhanh; báo cáo thì chấp nhận dữ liệu cũ một chút để các con số khớp nhau.
 
 ### 9. Bổ sung: ETL và Delta Live Tables
 
