@@ -16,6 +16,7 @@
     - [4. MVCC](#4-mvcc)
       - [Snapshot isolation và write skew](#snapshot-isolation-và-write-skew)
       - [MVCC và isolation level: hai thứ khác nhau](#mvcc-và-isolation-level-hai-thứ-khác-nhau)
+      - [Hai transaction cùng sửa một dòng: database biết bằng cách nào](#hai-transaction-cùng-sửa-một-dòng-database-biết-bằng-cách-nào)
     - [5. Pessimistic và optimistic concurrency control](#5-pessimistic-và-optimistic-concurrency-control)
       - [Pessimistic control](#pessimistic-control)
       - [Optimistic control](#optimistic-control)
@@ -188,6 +189,31 @@ Lưu ý: "MVCC luôn bật ở cả 4 level" chỉ đúng với PostgreSQL. MySQ
 | Chi phí | Chờ, nguy cơ deadlock | Tốn chỗ lưu bản cũ, cần dọn (`VACUUM` ở PostgreSQL) |
 
 Vậy MVCC không đổi việc transaction *thấy gì*, mà đổi việc có *phải chờ nhau* hay không.
+
+#### Hai transaction cùng sửa một dòng: database biết bằng cách nào
+
+Nguyên tắc chung ở mọi DBMS dùng MVCC: **MVCC chỉ lo việc đọc. Việc ghi cùng một dòng vẫn bị tuần tự hóa, mỗi lần chỉ một transaction được ghi.**
+
+Hai thành phần chung (tên trường mỗi DBMS đặt khác nhau, ý nghĩa như nhau):
+
+1. **Mỗi phiên bản của dòng được gắn nhãn transaction:** biết version do transaction nào tạo, và transaction nào đã thay thế hoặc xóa nó (bằng transaction ID hoặc timestamp).
+2. **Một dấu "đang có người sửa" trên dòng:** có thể là row lock, hoặc nhãn "đang bị sửa bởi transaction X" trên version.
+
+Ví dụ: `balance = 100`, T1 và T2 cùng muốn sửa dòng đó.
+
+| Bước | Điều xảy ra |
+|---|---|
+| 1 | T1 sửa dòng: tạo version mới và đặt dấu "T1 đang sửa dòng này" |
+| 2 | T2 muốn sửa cùng dòng: thấy dấu của T1 mà T1 chưa kết thúc, nên database biết có hai bên cùng sửa một dòng |
+| 3 | T2 bị xử lý theo một trong hai kiểu: **chờ** T1 kết thúc (blocking, phổ biến nhất), hoặc **bị hủy** và phải retry (first committer wins, như optimistic control ở Delta Lake) |
+| 4 | T1 rollback: dấu bị gỡ, T2 sửa tiếp. T1 commit: tùy isolation level, T2 đọc lại giá trị mới rồi ghi tiếp, hoặc nhận lỗi và phải retry |
+
+Vì sao phải chặn: nếu không, cả hai cùng đọc 100 rồi cùng ghi 90, mất một lần trừ (lost update). Dù có nhiều version, chỉ có **một dòng mới nhất** để ghi tiếp lên, và việc ghi lên nó phải xếp hàng.
+
+| | Xử lý bằng gì |
+|---|---|
+| Người đọc | Version cũ theo snapshot, không chờ |
+| Hai người cùng ghi một dòng | Dấu hoặc lock trên dòng, người sau chờ hoặc bị hủy |
 
 ### 5. Pessimistic và optimistic concurrency control
 
