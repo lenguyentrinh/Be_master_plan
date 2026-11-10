@@ -15,6 +15,7 @@
       - [Two-phase locking (2PL)](#two-phase-locking-2pl)
     - [4. MVCC](#4-mvcc)
       - [Snapshot isolation và write skew](#snapshot-isolation-và-write-skew)
+      - [MVCC và isolation level: hai thứ khác nhau](#mvcc-và-isolation-level-hai-thứ-khác-nhau)
     - [5. Pessimistic và optimistic concurrency control](#5-pessimistic-và-optimistic-concurrency-control)
       - [Pessimistic control](#pessimistic-control)
       - [Optimistic control](#optimistic-control)
@@ -156,6 +157,37 @@ Cách database xử lý xung đột ghi (khi **cùng một dòng**):
 - **PostgreSQL và MySQL/InnoDB thực tế:** không đợi tới lúc commit mới phát hiện xung đột ghi. Transaction ghi sau bị chặn ngay ở câu `UPDATE` cho đến khi transaction trước kết thúc. Sau đó:
   - Read Committed (PostgreSQL): nó đọc lại dòng mới nhất và ghi tiếp.
   - Repeatable Read (PostgreSQL): nó nhận lỗi serialization failure (SQLSTATE `40001`) và phải retry.
+
+#### MVCC và isolation level: hai thứ khác nhau
+
+- **MVCC** là việc *lưu*: giữ nhiều phiên bản của một dòng (bản cũ và bản mới).
+- **Isolation level** là *luật chọn*: khi đọc, transaction được xem phiên bản nào trong số đó.
+
+Ở PostgreSQL, MVCC luôn bật. Các level chỉ khác nhau ở thời điểm lấy snapshot:
+
+| Level (PostgreSQL) | Snapshot lấy khi nào | Hệ quả |
+|---|---|---|
+| Read Uncommitted / Read Committed | Mỗi câu lệnh | Hai lần đọc có thể thấy dữ liệu khác nhau (non-repeatable read) |
+| Repeatable Read | Đầu transaction | Mọi lần đọc thấy cùng một snapshot |
+| Serializable | Đầu transaction, cộng bước kiểm tra xung đột (SSI) | Chặn cả write skew |
+
+Ví dụ: `balance = 100`. Transaction A đọc 100, sau đó B sửa thành 50 và commit, rồi A đọc lần hai.
+
+- Read Committed: A thấy **50** (snapshot mới cho mỗi câu lệnh).
+- Repeatable Read: A vẫn thấy **100** (snapshot cố định từ đầu).
+
+Lưu ý: "MVCC luôn bật ở cả 4 level" chỉ đúng với PostgreSQL. MySQL/InnoDB ở `Read Uncommitted` đọc thẳng bản mới nhất (không dùng snapshot) và ở `Serializable` chuyển sang lock. SQL Server mặc định dùng lock, chỉ dùng MVCC khi bật `READ_COMMITTED_SNAPSHOT`.
+
+**Repeatable Read có MVCC khác gì không có MVCC?** Cả hai đều cho A đọc 100 ở cả hai lần, nhưng khác ở việc có phải chờ nhau không:
+
+| | Không MVCC (dùng lock) | Có MVCC |
+|---|---|---|
+| Cách giữ kết quả đọc ổn định | Khóa dòng A khi đọc | Giữ bản cũ cho A đọc, không khóa |
+| B muốn sửa A | Phải chờ A xong | Sửa ngay, tạo bản mới |
+| Reader và writer | Chặn lẫn nhau | Không chặn nhau |
+| Chi phí | Chờ, nguy cơ deadlock | Tốn chỗ lưu bản cũ, cần dọn (`VACUUM` ở PostgreSQL) |
+
+Vậy MVCC không đổi việc transaction *thấy gì*, mà đổi việc có *phải chờ nhau* hay không.
 
 ### 5. Pessimistic và optimistic concurrency control
 
