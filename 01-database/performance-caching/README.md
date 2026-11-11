@@ -13,6 +13,7 @@
     - [3. Tối ưu câu query](#3-tối-ưu-câu-query)
     - [4. Index hiệu quả và sargability](#4-index-hiệu-quả-và-sargability)
     - [5. Theo dõi logical/physical reads và IOPS](#5-theo-dõi-logicalphysical-reads-và-iops)
+      - [Materialized view là gì](#materialized-view-là-gì)
     - [6. Tránh parameter sniffing](#6-tránh-parameter-sniffing)
     - [7. Quản lý transaction cẩn thận](#7-quản-lý-transaction-cẩn-thận)
     - [8. Partition bảng lớn](#8-partition-bảng-lớn)
@@ -90,13 +91,14 @@ Tên tham số khác nhau giữa các hệ quản trị.
   ```
   - `LIKE '%PEN%'` (wildcard đầu) buộc quét toàn bảng; `LIKE 'PEN%'` có thể dùng index.
   - `NOT IN`, `<>`, `!=` có thể gây full scan; viết lại thành điều kiện khoảng.
-  - Thay `OR` trên cột có index bằng `IN` hoặc `UNION`.
+  - `OR` trên **cùng một cột** nên viết thành `IN` cho gọn. Hiệu năng thường như nhau vì optimizer coi hai cách là một (đã thử trên SQLite: cùng plan, đều dùng index). Bài reference gọi bản `OR` là "không tốt", nhưng khi kiểm tra thực tế thì không đúng; cần kiểm chứng bằng `EXPLAIN` trên DB đang dùng.
     ```sql
-    -- Không tốt
+    -- Cách 1
     SELECT * FROM Employees WHERE Department = 'Sales' OR Department = 'Marketing';
-    -- Tốt hơn
+    -- Cách 2 (ngắn hơn, plan giống cách 1)
     SELECT * FROM Employees WHERE Department IN ('Sales', 'Marketing');
     ```
+  - `OR` trên **các cột khác nhau** (ví dụ `department = 'Sales' OR city = 'Hanoi'`) có thể làm optimizer không dùng được index. Khi đó thử tách bằng `UNION ALL` (dùng `UNION` thì tốn thêm bước khử trùng lặp) và so sánh bằng `EXPLAIN`. Không phải lúc nào cũng nhanh hơn, vì có DB gộp được hai index (ví dụ BitmapOr của PostgreSQL).
 - **Giảm bookmark lookup:** dùng covering index chứa đủ cột cần, hoặc `INCLUDE` cho cột không phải key; hoặc viết lại query để cần ít cột hơn.
 - **Row store và columnar store:** columnar (Parquet, Snowflake, BigQuery) nén tốt và tổng hợp nhanh, hợp với analytics khó đoán trước, và giảm nhu cầu tạo nhiều index.
 
@@ -104,6 +106,37 @@ Tên tham số khác nhau giữa các hệ quản trị.
 
 - IOPS cao thường do đọc vật lý quá nhiều.
 - Cách xử lý: đơn giản hóa query, tăng buffer cache, bật query result caching, dùng materialized view cho query phức tạp hoặc chạy thường xuyên.
+
+#### Materialized view là gì
+
+Materialized view là một view mà **kết quả được lưu sẵn thành dữ liệu thật trên đĩa**, thay vì chạy lại query mỗi lần đọc. Về bản chất đây là cache kết quả query nằm ngay trong database.
+
+| | View thường | Materialized view |
+|---|---|---|
+| Lưu gì | Chỉ lưu câu query | Lưu câu query và kết quả của nó |
+| Khi `SELECT` | Chạy lại query gốc mỗi lần | Đọc kết quả đã lưu, nhanh |
+| Dữ liệu | Luôn mới nhất | Có thể cũ cho đến khi làm mới |
+| Chi phí | Không tốn chỗ lưu | Tốn chỗ lưu và tốn công làm mới |
+
+Ví dụ: báo cáo doanh thu theo ngày từ bảng `orders` có hàng chục triệu dòng, query `GROUP BY` chạy mất vài chục giây. Dashboard gọi query này mỗi lần mở trang thì rất chậm.
+
+```sql
+-- Cú pháp PostgreSQL
+CREATE MATERIALIZED VIEW daily_revenue AS
+SELECT order_date, SUM(total_amount) AS revenue
+FROM orders
+GROUP BY order_date;
+
+-- Dashboard chỉ đọc kết quả đã tính sẵn
+SELECT * FROM daily_revenue WHERE order_date = '2023-10-01';
+
+-- Làm mới khi cần (ví dụ mỗi đêm)
+REFRESH MATERIALIZED VIEW daily_revenue;
+```
+
+Đánh đổi: nhanh hơn nhưng dữ liệu có thể cũ. Giữa hai lần `REFRESH`, đơn hàng mới chưa hiện trong `daily_revenue`. Hợp với báo cáo hoặc dashboard chấp nhận số liệu trễ một chút; không hợp với dữ liệu cần chính xác từng giây như số dư tài khoản.
+
+Cú pháp và cách làm mới khác nhau giữa các DBMS (ví dụ Oracle có làm mới tự động, SQL Server gọi là indexed view). Đoạn SQL trên chưa được chạy thử.
 
 ### 6. Tránh parameter sniffing
 
