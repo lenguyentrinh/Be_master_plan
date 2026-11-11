@@ -11,3 +11,4 @@
    1. Đọc refer tham khảo, ghi note vào `README.md` của topic.
 
 9. **Mỗi khái niệm phải có ví dụ thực tế.** Khi present, mỗi loại index/khái niệm cần kèm một case thực tế (bảng, dữ liệu, query cụ thể trong nghiệp vụ như đơn hàng, người dùng) cho thấy vấn đề gặp phải, cách giải quyết, và kết quả trước/sau (ví dụ output `EXPLAIN`), để người nghe hiểu được ý, không chỉ có cú pháp. Case bổ sung viết ở file riêng của topic (ví dụ `real_cases.md`), không sửa text cũ trong `README.md`.
+10. **Mỗi bài (`README.md` của topic) bắt buộc có mục lục (`## Mục lục`)** liệt kê các mục chính kèm link anchor, đặt ngay sau phần tiêu đề. Khi thêm section mới vào README thì phải thêm dòng tương ứng vào mục lục.
