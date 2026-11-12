@@ -12,3 +12,6 @@
 
 9. **Mỗi khái niệm phải có ví dụ thực tế.** Khi present, mỗi loại index/khái niệm cần kèm một case thực tế (bảng, dữ liệu, query cụ thể trong nghiệp vụ như đơn hàng, người dùng) cho thấy vấn đề gặp phải, cách giải quyết, và kết quả trước/sau (ví dụ output `EXPLAIN`), để người nghe hiểu được ý, không chỉ có cú pháp. Case bổ sung viết ở file riêng của topic (ví dụ `real_cases.md`), không sửa text cũ trong `README.md`.
 10. **Mỗi bài (`README.md` của topic) bắt buộc có mục lục (`## Mục lục`)** liệt kê các mục chính kèm link anchor, đặt ngay sau phần tiêu đề. Khi thêm section mới vào README thì phải thêm dòng tương ứng vào mục lục.
+11. **`README.md` chỉ ghi note ngắn gọn nhưng đủ ý để người đọc hiểu; phần giải thích sâu, sơ đồ, ví dụ từng bước viết ở file riêng của topic** (ví dụ `sort_buffer.md`) và README phải có link sang file đó để ai muốn hiểu sâu thì tra cứu.
+12. **Mỗi mục trong `README.md` phải có link sang case tương ứng trong `real_cases.md`** (dạng `[real_cases.md, Case N](real_cases.md#anchor)`), đặt ở cuối mục. Khi thêm mục mới vào README thì thêm case tương ứng vào `real_cases.md` và link qua.
+13. **Real case phải dựa trên file demo của topic** (ví dụ `demo_mysql.sql`: bảng `users`, MySQL 8.0.18+), chạy thử được bằng cách copy từ trên xuống, và không ghi số liệu bịa; chỉ ghi cần nhìn vào đâu và kỳ vọng thấy gì.

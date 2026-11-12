@@ -10,6 +10,7 @@
   - [Key concepts](#key-concepts)
     - [1. Đọc execution plan](#1-đọc-execution-plan)
     - [2. Chỉnh các tham số bộ nhớ (ví dụ PostgreSQL)](#2-chỉnh-các-tham-số-bộ-nhớ-ví-dụ-postgresql)
+      - [Sort buffer và merge pass (MySQL)](#sort-buffer-và-merge-pass-mysql)
     - [3. Tối ưu câu query](#3-tối-ưu-câu-query)
     - [4. Index hiệu quả và sargability](#4-index-hiệu-quả-và-sargability)
     - [5. Theo dõi logical/physical reads và IOPS](#5-theo-dõi-logicalphysical-reads-và-iops)
@@ -32,11 +33,15 @@
 
 Ý chính của bài: viết SQL chạy đúng thì dễ, viết SQL chạy hiệu quả mới khó. Phần lớn vấn đề hiệu năng đến từ query chưa tối ưu, và tuning là việc làm liên tục chứ không phải sửa một lần. Lưu ý: lời khuyên cho OLTP không phải lúc nào cũng hợp với data pipeline, nơi ghi dữ liệu tốn kém và index phải build lại mỗi lần chạy.
 
+Ví dụ thực tế chạy thử được cho từng mục 1 đến 10 (MySQL, bảng `users`): [real_cases.md](real_cases.md).
+
 ### 1. Đọc execution plan
 
 - Dùng `EXPLAIN` để biết database lấy dữ liệu thế nào: dùng index nào, join ra sao, quét toàn bảng hay một phần.
 - Tìm operator tốn nhất (ví dụ full table scan) để tối ưu trước.
 - Xem các gợi ý và cảnh báo về index mà công cụ đưa ra.
+
+Ví dụ thực tế: [real_cases.md, Case 1](real_cases.md#case-1-đọc-execution-plan-tìm-operator-tốn-nhất)
 
 ### 2. Chỉnh các tham số bộ nhớ (ví dụ PostgreSQL)
 
@@ -48,6 +53,17 @@
 | `effective_cache_size` | Ước lượng bộ nhớ có thể cache (gồm `shared_buffers` và cache của OS) | Đặt đúng tổng bộ nhớ dùng để cache |
 
 Tên tham số khác nhau giữa các hệ quản trị.
+
+#### Sort buffer và merge pass (MySQL)
+
+Trong MySQL, `sort_buffer_size` (tương ứng `work_mem` của PostgreSQL) là **RAM** dùng để sort khi `ORDER BY` trên cột không có index.
+
+- **Vừa buffer:** sort xong trong RAM.
+- **Không vừa:** sort từng đoạn, ghi ra file tạm trên đĩa, rồi trộn lại (mỗi lượt trộn là một merge pass). Dùng đĩa nên chậm.
+- **`Sort_merge_passes`:** đếm số lượt trộn. Bằng 0 là sort trong RAM, lớn hơn 0 là có dùng đĩa. Đo bằng `FLUSH STATUS;` rồi chạy query rồi `SHOW SESSION STATUS LIKE 'Sort_merge_passes';`.
+- **Cách xử lý:** đánh index cho cột `ORDER BY`, hoặc tăng `sort_buffer_size` cho riêng session nặng. Không tăng toàn cục vì buffer được cấp mỗi connection, mỗi lần sort.
+
+Giải thích chi tiết, sơ đồ và ví dụ từng bước: [sort_buffer.md](sort_buffer.md). Chạy thử: [real_cases.md, Case 2](real_cases.md#case-2-chỉnh-tham-số-bộ-nhớ-buffer-nhỏ-làm-sort-phải-chia-nhiều-lượt).
 
 ### 3. Tối ưu câu query
 
@@ -76,6 +92,8 @@ Tên tham số khác nhau giữa các hệ quản trị.
 - **Tránh sắp xếp không cần thiết:** chỉ dùng `ORDER BY` khi cần, tốt nhất trên cột đã có index.
 - **Khớp kiểu dữ liệu:** kiểu không khớp gây chuyển đổi ngầm, làm chậm query và có thể làm mất khả năng dùng index. Ví dụ so sánh cột `varchar` với số nguyên (SQL Server): cast giá trị về đúng kiểu của cột. PostgreSQL thường xử lý ép kiểu tốt hơn.
 
+Ví dụ thực tế: [real_cases.md, Case 3](real_cases.md#case-3-tối-ưu-câu-query)
+
 ### 4. Index hiệu quả và sargability
 
 - **Đánh index** cho cột hay dùng trong `WHERE`, `DISTINCT`, `JOIN`, `ORDER BY`, `GROUP BY`.
@@ -101,6 +119,8 @@ Tên tham số khác nhau giữa các hệ quản trị.
   - `OR` trên **các cột khác nhau** (ví dụ `department = 'Sales' OR city = 'Hanoi'`) có thể làm optimizer không dùng được index. Khi đó thử tách bằng `UNION ALL` (dùng `UNION` thì tốn thêm bước khử trùng lặp) và so sánh bằng `EXPLAIN`. Không phải lúc nào cũng nhanh hơn, vì có DB gộp được hai index (ví dụ BitmapOr của PostgreSQL).
 - **Giảm bookmark lookup:** dùng covering index chứa đủ cột cần, hoặc `INCLUDE` cho cột không phải key; hoặc viết lại query để cần ít cột hơn.
 - **Row store và columnar store:** columnar (Parquet, Snowflake, BigQuery) nén tốt và tổng hợp nhanh, hợp với analytics khó đoán trước, và giảm nhu cầu tạo nhiều index.
+
+Ví dụ thực tế: [real_cases.md, Case 4](real_cases.md#case-4-index-hiệu-quả-và-sargability)
 
 ### 5. Theo dõi logical/physical reads và IOPS
 
@@ -138,10 +158,14 @@ REFRESH MATERIALIZED VIEW daily_revenue;
 
 Cú pháp và cách làm mới khác nhau giữa các DBMS (ví dụ Oracle có làm mới tự động, SQL Server gọi là indexed view). Đoạn SQL trên chưa được chạy thử.
 
+Ví dụ thực tế: [real_cases.md, Case 5](real_cases.md#case-5-theo-dõi-readsiops-và-materialized-view)
+
 ### 6. Tránh parameter sniffing
 
 - Plan được cache theo giá trị tham số của lần chạy đầu có thể chạy tệ với giá trị khác.
 - Ví dụ trong bài (SQL Server): `WITH RECOMPILE` trên stored procedure, hint `OPTION(RECOMPILE)` trên query. Ngoài ra có thể dùng biến trung gian hoặc tắt parameter sniffing ở mức instance hoặc query.
+
+Ví dụ thực tế: [real_cases.md, Case 6](real_cases.md#case-6-parameter-sniffing)
 
 ### 7. Quản lý transaction cẩn thận
 
@@ -149,11 +173,15 @@ Cú pháp và cách làm mới khác nhau giữa các DBMS (ví dụ Oracle có 
 - Chạy tác vụ nặng hoặc bulk ngoài giờ cao điểm.
 - Chọn isolation level cân bằng giữa nhất quán và hiệu năng; mức thấp hơn có thể giúp workload nhiều đọc.
 
+Ví dụ thực tế: [real_cases.md, Case 7](real_cases.md#case-7-quản-lý-transaction-cẩn-thận)
+
 ### 8. Partition bảng lớn
 
 - Partition giúp giảm lượng dữ liệu phải quét và cho phép xử lý song song.
 - Chọn partition key phân bố đều và khớp với cách đọc, ghi phổ biến.
 - Quá nhiều partition gây overhead, nên chia vừa với dữ liệu và nhu cầu query.
+
+Ví dụ thực tế: [real_cases.md, Case 8](real_cases.md#case-8-partition-bảng-lớn)
 
 ### 9. Cập nhật statistics định kỳ
 
@@ -161,11 +189,15 @@ Cú pháp và cách làm mới khác nhau giữa các DBMS (ví dụ Oracle có 
 - Làm mới bằng `ANALYZE` (PostgreSQL) hoặc `UPDATE STATISTICS` (SQL Server).
 - Đo hiệu năng bằng `SET STATISTICS TIME ON` và `SET STATISTICS IO ON` (SQL Server).
 
+Ví dụ thực tế: [real_cases.md, Case 9](real_cases.md#case-9-cập-nhật-statistics)
+
 ### 10. Cách tiếp cận declarative và tính năng riêng của nền tảng
 
 - Nhiều nền tảng tự tối ưu sẵn (ví dụ micro-partitioning của Snowflake, clustering lúc ingest và adaptive query execution của Databricks). Không nên tuning tay phần nền tảng đã tự làm; partition thủ công trên Databricks thường kém hơn clustering tự động.
 - Cấu hình declarative mô tả *làm gì* thay vì *làm thế nào*, nên dễ debug, tái sử dụng và tối ưu.
 - Bài giới thiệu DataForge (chạy trên Databricks) như một ví dụ cho cách tiếp cận này.
+
+Ví dụ thực tế: [real_cases.md, Case 10](real_cases.md#case-10-declarative-và-tính-năng-riêng-của-nền-tảng)
 
 ### Ghi chú về phạm vi
 
