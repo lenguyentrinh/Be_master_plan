@@ -1,2 +1,7 @@
-1. `cost` là gì trong `EXPLAIN`? Nó là “mức độ tốn kém ước tính” (không có đơn vị, không phải thời gian chạy) để database lựa chọn giữa các cách chạy query.
-2. Mình đã tạo index trên cột order_date. Tại sao khi dùng WHERE YEAR(order_date) = 2024 thì optimizer không dùng index này (non-sargable)?
+1. `cost` là gì trong `EXPLAIN`? Nó là “mức độ tốn kém ước tính” (không có đơn vị, không phải thời gian chạy) để database lựa chọn giữa các cách chạy query. _(Part: 1. Đọc execution plan)_
+2. Mình đã tạo index trên cột order_date. Tại sao khi dùng WHERE YEAR(order_date) = 2024 thì optimizer không dùng index này (non-sargable)? _(Part: 4. Index hiệu quả và sargability)_ ▎ I created an index on the order_date column. Why doesn't the optimizer use this index when I use WHERE YEAR(order_date) = 2024?
+3. Khi sort 100.000 dòng mà `sort_buffer` chỉ chứa vừa 10.000 dòng thì MySQL làm gì? Các đoạn đã sort được cất ở đâu và được trộn lại ở đâu? _(Part: 2. Chỉnh các tham số bộ nhớ)_
+4. `Sort_merge_passes` là gì? Giá trị 0 và giá trị lớn hơn 0 cho biết điều gì? Vì sao phải chạy `FLUSH STATUS` trước khi đo? _(Part: 2. Chỉnh các tham số bộ nhớ)_
+5. Vì sao có nhiều merge pass? Buffer lớn hơn thì số pass thay đổi thế nào? _(Part: 2. Chỉnh các tham số bộ nhớ)_
+6. Bảng tổng hợp (hoặc materialized view) cũng lưu trên đĩa như bảng thường, vậy vì sao đọc nó vẫn nhanh hơn nhiều so với chạy lại query `GROUP BY` trên bảng gốc? Nó nhanh vì nằm trong RAM hay vì lý do khác? _(Part: 5. Theo dõi logical/physical reads và IOPS)_
+7. Vì sao `rows` trong `EXPLAIN` lệch xa so với số dòng thực tế trong `EXPLAIN ANALYZE`? Khi nào cần chạy `ANALYZE TABLE` để cập nhật statistics, và sau khi chạy thì plan thay đổi thế nào? _(Part: 1. Đọc execution plan)_ ▎ Why does `rows` in `EXPLAIN` differ greatly from the actual row count in `EXPLAIN ANALYZE`? When should `ANALYZE TABLE` be run to update statistics, and how does the plan change afterward?

@@ -63,6 +63,8 @@ Trong MySQL, `sort_buffer_size` (tương ứng `work_mem` của PostgreSQL) là 
 - **`Sort_merge_passes`:** đếm số lượt trộn. Bằng 0 là sort trong RAM, lớn hơn 0 là có dùng đĩa. Đo bằng `FLUSH STATUS;` rồi chạy query rồi `SHOW SESSION STATUS LIKE 'Sort_merge_passes';`.
 - **Cách xử lý:** đánh index cho cột `ORDER BY`, hoặc tăng `sort_buffer_size` cho riêng session nặng. Không tăng toàn cục vì buffer được cấp mỗi connection, mỗi lần sort.
 
+Phân biệt với `innodb_buffer_pool_size` (cache page dùng chung, khác với vùng sort riêng từng connection): xem [buffer_pool.md](buffer_pool.md#7-phân-biệt-innodb_buffer_pool_size-và-sort_buffer_size).
+
 Giải thích chi tiết, sơ đồ và ví dụ từng bước: [sort_buffer.md](sort_buffer.md). Chạy thử: [real_cases.md, Case 2](real_cases.md#case-2-chỉnh-tham-số-bộ-nhớ-buffer-nhỏ-làm-sort-phải-chia-nhiều-lượt).
 
 ### 3. Tối ưu câu query
@@ -74,7 +76,7 @@ Giải thích chi tiết, sơ đồ và ví dụ từng bước: [sort_buffer.md
   -- Tốt hơn
   SELECT order_id, customer_id, order_date FROM orders WHERE order_date = '2023-10-01';
   ```
-- **Tránh `SELECT DISTINCT`:** tốn tài nguyên. Dùng bộ lọc cụ thể hơn hoặc `GROUP BY`. Nếu bắt buộc dùng thì đánh index cột liên quan.
+- **Tránh `SELECT DISTINCT` không cần thiết:** DB phải sort hoặc dùng bảng tạm để khử trùng nên tốn tài nguyên. Dùng bộ lọc (`WHERE`) cụ thể hơn để ít dòng phải khử trùng, và kiểm tra xem `DISTINCT` có đang che lỗi join nhân dòng không. Đổi sang `GROUP BY` thường không nhanh hơn vì optimizer coi hai cách là một (đã thử trên SQLite: cùng plan; cần kiểm chứng bằng `EXPLAIN` trên DB đang dùng). Nếu bắt buộc dùng thì đánh index cột liên quan để DB đi dọc index thay vì khử trùng.
 - **Dùng join thay cho correlated subquery:** correlated subquery chạy một lần cho mỗi dòng. Gộp tính toán một lần (CTE) rồi join.
   ```sql
   -- Không tốt: subquery chạy cho từng dòng
@@ -126,6 +128,16 @@ Ví dụ thực tế: [real_cases.md, Case 4](real_cases.md#case-4-index-hiệu-
 
 - IOPS cao thường do đọc vật lý quá nhiều.
 - Cách xử lý: đơn giản hóa query, tăng buffer cache, bật query result caching, dùng materialized view cho query phức tạp hoặc chạy thường xuyên.
+
+Ghi chú ngắn (MySQL/InnoDB):
+
+- **Logical read:** đọc dữ liệu đã có trong RAM (buffer pool), nhanh. **Physical read:** dữ liệu chưa có trong RAM nên phải đọc từ đĩa, chậm. Physical read càng nhiều thì IOPS càng cao.
+- **Cách đo:** chạy `SHOW GLOBAL STATUS LIKE 'Innodb_buffer_pool_read%';` trước và sau query rồi lấy hiệu. `Innodb_buffer_pool_read_requests` là logical, `Innodb_buffer_pool_reads` là physical.
+- **Lưu ý:** bảng nhỏ thường nằm sẵn trong RAM nên physical read có thể bằng 0. Bộ đếm này là `GLOBAL`, nên lẫn hoạt động của session khác.
+- **Dữ liệu nằm ở đâu:** bảng và index đều lưu trên đĩa, chia thành các page (16 KB). RAM (buffer pool) chỉ giữ bản sao các page đang dùng, page lâu không dùng bị đẩy ra. Tăng buffer pool thì nhiều page nằm sẵn trong RAM hơn nên giảm physical read.
+- **Bảng tổng hợp / materialized view:** cũng nằm trên đĩa. Nhanh vì đã tính sẵn nên chỉ đọc rất ít dòng, không phải vì nằm trong RAM.
+
+Giải thích chi tiết và sơ đồ: [buffer_pool.md](buffer_pool.md).
 
 #### Materialized view là gì
 
