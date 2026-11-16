@@ -107,8 +107,8 @@ COMMIT;
 `FOR UPDATE` yêu cầu database khóa dòng được đọc để transaction khác không thể đồng thời sửa dòng đó trước khi transaction hiện tại kết thúc.
 
 #### Two-phase locking (2PL)
-
 2PL chia transaction thành hai giai đoạn:
+
 
 1. **Growing phase:** chỉ được lấy thêm lock, không được nhả lock.
 2. **Shrinking phase:** chỉ được nhả lock, không được lấy thêm lock.
