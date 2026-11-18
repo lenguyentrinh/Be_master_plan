@@ -5,3 +5,6 @@
 5. Vì sao có nhiều merge pass? Buffer lớn hơn thì số pass thay đổi thế nào? _(Part: 2. Chỉnh các tham số bộ nhớ)_
 6. Bảng tổng hợp (hoặc materialized view) cũng lưu trên đĩa như bảng thường, vậy vì sao đọc nó vẫn nhanh hơn nhiều so với chạy lại query `GROUP BY` trên bảng gốc? Nó nhanh vì nằm trong RAM hay vì lý do khác? _(Part: 5. Theo dõi logical/physical reads và IOPS)_
 7. Vì sao `rows` trong `EXPLAIN` lệch xa so với số dòng thực tế trong `EXPLAIN ANALYZE`? Khi nào cần chạy `ANALYZE TABLE` để cập nhật statistics, và sau khi chạy thì plan thay đổi thế nào? _(Part: 1. Đọc execution plan)_ ▎ Why does `rows` in `EXPLAIN` differ greatly from the actual row count in `EXPLAIN ANALYZE`? When should `ANALYZE TABLE` be run to update statistics, and how does the plan change afterward?
+8. If partitioning splits data into smaller pieces, why can a partitioned table still be slower than a normal table?
+9. Does partitioning make INSERT slower, and in what situations?"
+ 
