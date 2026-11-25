@@ -82,13 +82,6 @@ Gọi nhiều lần kết quả vẫn như gọi một lần. `PUT` bắt buộc
 **Q15. Backend làm sao biết dữ liệu đã đổi để trả `304`? `304` có giúp giảm tải database không? Frontend có biết về `304` không?**
 - **Cách project đang dùng (`ShallowEtagHeaderFilter`, `HttpCacheConfig.java`):** backend không thật sự "biết" dữ liệu đổi. Mỗi request nó vẫn chạy bình thường (`findByActiveTrueOrderByNameAsc()`, dựng response JSON), rồi băm body thành `ETag` và so với `If-None-Match` của client. Trùng thì thay bằng `304` và bỏ body, khác thì trả `200` kèm body mới.
 - **Hệ quả:** database vẫn bị truy vấn mỗi lần. `304` chỉ tiết kiệm **băng thông** (không gửi body), không giảm tải database. Với bảng nhỏ như `categories` thì chấp nhận được.
-- **Tiết kiệm băng thông ở đâu: chỉ ở đoạn mạng giữa backend và trình duyệt, đúng bằng kích thước phần body.**
-  ```
-  Database --(query vẫn chạy đủ)--> Backend --(đoạn này tiết kiệm: 304 không có body)--> Trình duyệt
-  ```
-  - **Có tiết kiệm:** body response. `304` chỉ gửi header, trình duyệt lấy body đã lưu trong cache của máy (không qua mạng) rồi đưa cho FE.
-  - **Không tiết kiệm:** query database, việc dựng JSON và băm ETag ở backend (vẫn làm đủ mỗi lần).
-  - Lượng tiết kiệm phụ thuộc body lớn hay nhỏ: `/categories` chỉ vài dòng nên gần như không đáng kể, danh sách lớn hoặc mạng chậm/di động thì mới rõ. Tự đo bằng tab Network: so cột **Size** của request `200` với request `304`.
 - **Frontend không biết về `304`.** Trình duyệt tự gửi `If-None-Match`, tự nhận `304`, rồi lấy body đã lưu trong cache đưa cho axios dưới dạng response đầy đủ. Code FE (axios, store) vẫn nhận dữ liệu bình thường và cập nhật store.
 - **Khác `max-age`/`staleTime`:** ở đây FE dùng bản cũ vì **server đã xác nhận** bản đó còn đúng, không phải tự coi là còn dùng được.
 - **Cách thật sự "biết" mà không cần dựng response:** dùng dấu hiệu thay đổi lưu sẵn, ví dụ `MAX(updateAt)` (`BaseEntity` đã có `updateAt`, `@LastModifiedDate`), cột version (`@Version`), hoặc biến đếm phiên bản cập nhật khi tạo/sửa/xóa. Giảm cả tải database nhưng phức tạp hơn và dễ sai (ví dụ xóa mềm có cập nhật `updateAt` hay không).

@@ -193,7 +193,7 @@ Tên header hay gặp: `Correlation-ID`, `X-Request-ID`, `X-Trace-ID`.
 - Real case: [real_cases.md, Case 11](real_cases.md#case-11)
 
 ### 12. OpenAPI Initiative
-**Khái niệm:** OpenAPI (trước là Swagger) là chuẩn file mô tả toàn bộ API (endpoint, tham số, response). Nên thiết kế file này trước (contract-first) rồi mới viết code, và từ đó sinh được tài liệu và client library.
+**Khái niệm:** OpenAPI (trước là Swagger) là chuẩn file mô tả toàn bộ API của hệ thống (endpoint, tham số, response, lỗi). Bài gốc khuyên viết file này trước (contract-first) rồi mới code, để frontend và backend thống nhất từ đầu. Từ file này sinh được tài liệu, client library, và trang Swagger UI để xem và gọi thử API.
 
 - **OpenAPI** (trước là Swagger) là chuẩn file mô tả toàn bộ API: endpoint, tham số, response.
 - Khuyến khích **contract-first**: thiết kế file mô tả (contract) trước rồi mới viết code, thay vì code xong mới mô tả.
