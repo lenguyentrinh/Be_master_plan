@@ -54,9 +54,9 @@ Các mục dưới đây đi theo đúng thứ tự mục lục của bài báo.
   - Đúng: `POST /courses`
   - Sai: `POST /create-course`
 - **Collection dùng danh từ số nhiều.** `/courses` là danh sách khóa học, `/courses/5` là khóa học số 5.
-- **Quan hệ giữ đơn giản.** `/courses/5/sessions` là các buổi học của khóa 5. Không viết `/users/1/enrollments/99/sessions` (dài, đổi quan hệ là vỡ). Nên gọi `/users/1/enrollments` rồi `/courses/99/sessions`. Tip của bài: URI không nên phức tạp hơn dạng *collection/item/collection*.
-- **Tránh quá nhiều resource nhỏ.** Hiển thị 1 trang mà client phải gọi 10 request thì chậm (gọi là API "chatty"). Nên gộp dữ liệu hay đi cùng nhau vào một response, nhưng đừng gộp quá, kẻo trả cả dữ liệu client không cần.
-- **Đừng mirror cấu trúc database.** Không cần mỗi table là một endpoint. API mô tả nghiệp vụ, không phải bảng, để đổi schema DB thì client không bị ảnh hưởng và không lộ dữ liệu nội bộ.
+- **Quan hệ không lồng quá sâu (tối đa dạng *collection/item/collection*).** `/courses/5/sessions` là các buổi học của khóa 5. Không viết `/users/1/enrollments/99/sessions` vì dài và gắn chặt các resource với nhau. Nên gọi `/users/1/enrollments`, rồi `/courses/7/sessions` (7 là course lấy từ enrollment).
+- **Tránh chatty API (một trang phải gọi quá nhiều request).** Một trang gọi 10 request thì chậm, do resource chia quá nhỏ. Nên gộp dữ liệu hay đi cùng nhau vào một response, nhưng đừng gộp quá kẻo trả dữ liệu client không cần.
+- **Tránh thiết kế API theo table thay vì theo nghiệp vụ (Mirror database).** Không cần mỗi table là một endpoint. API mô tả nghiệp vụ, nên đổi schema DB client không bị ảnh hưởng và không lộ dữ liệu nội bộ. Khác chatty (lỗi số request), đây là lỗi cách đặt resource; hai lỗi hay đi chung nhưng có thể xảy ra riêng.
 - **Ngoại lệ:** việc không map được sang resource (ví dụ `GET /add?operand1=99&operand2=1` trả 100) thì cho phép nhưng dùng hạn chế.
 - Real case: [real_cases.md, Case 2](real_cases.md#case-2)
 
@@ -79,64 +79,61 @@ Một API không cần cài đủ mọi method, tùy nghiệp vụ.
 
 | Method | Code thường dùng |
 | --- | --- |
-| `GET` | `200` thành công, `204` không có nội dung (search không khớp), `404` không tìm thấy |
-| `POST` | `201 Created` kèm header `Location: /courses/42` (URL khóa học mới), `400` dữ liệu sai, `405` URI không hỗ trợ POST |
-| `PUT` | `200` / `204` sửa xong, `201` nếu tạo mới, `409` xung đột với trạng thái hiện tại |
-| `PATCH` | `200`, `400` patch sai format, `409` patch hợp lệ nhưng không áp dụng được, `415` không hỗ trợ format patch |
+| `GET` | `200` thành công, `404` không tìm thấy |
+| `POST` | `201 Created` + header `Location: /courses/42`, `400` dữ liệu sai |
+| `PUT` | `200`/`204` sửa xong, `201` nếu tạo mới, `409` xung đột |
+| `PATCH` | `200`, `400` sai format, `409` không áp dụng được, `415` không hỗ trợ format |
 | `DELETE` | `204` xóa xong, `404` không tồn tại |
 
-**Idempotent (gọi nhiều lần kết quả vẫn như gọi một lần):**
-- `PUT` bắt buộc idempotent. Mạng lag, client gửi lại `PUT /courses/1` 3 lần thì khóa học vẫn chỉ có một trạng thái cuối.
-- `POST` và `PATCH` không đảm bảo: gửi lại 3 lần `POST /courses` có thể tạo 3 khóa học trùng nhau.
+**Idempotent (gọi nhiều lần vẫn như gọi một lần):**
+- `PUT` bắt buộc idempotent: gửi lại `PUT /courses/1` 3 lần, kết quả vẫn một trạng thái.
+- `POST`, `PATCH` không đảm bảo: gửi lại 3 lần `POST /courses` có thể tạo 3 khóa học trùng.
 
 **PATCH có 2 format JSON:**
-- **JSON merge patch** (`application/merge-patch+json`): gửi các field cần đổi, `null` nghĩa là xóa field. Ví dụ `{"price":12,"color":null,"size":"small"}` là sửa `price`, xóa `color`, thêm `size`. Không dùng được nếu resource có giá trị `null` thật.
-- **JSON patch** (`application/json-patch+json`): gửi danh sách thao tác theo thứ tự (`add`, `remove`, `replace`, `copy`, `test`). Linh hoạt hơn nhưng dài hơn.
+- **JSON merge patch** (`application/merge-patch+json`): gửi field cần đổi, `null` là xóa field. Ví dụ `{"price":12,"color":null}` sửa `price`, xóa `color`.
+- **JSON patch** (`application/json-patch+json`): gửi danh sách thao tác (`add`, `remove`, `replace`...). Linh hoạt hơn nhưng dài hơn.
 
 **Resource MIME types:**
-- `Content-Type`: body mình gửi là format gì, ví dụ `Content-Type: application/json`.
-- `Accept`: mình muốn nhận format gì, ví dụ `Accept: application/json, application/xml`.
-- Server không hỗ trợ format client gửi thì trả `415 Unsupported Media Type`. Không có format nào khớp `Accept` thì trả `406 Not Acceptable`.
+- `Content-Type`: format body mình gửi, `Accept`: format mình muốn nhận.
+- Không hỗ trợ format gửi lên thì `415`, không có format nào khớp `Accept` thì `406`.
 - Real case: [real_cases.md, Case 3](real_cases.md#case-3)
 
 ### 4. Implement asynchronous methods
-**Vấn đề:** `POST /courses/1/clone` sao chép khóa học kèm toàn bộ buổi học mất 2 phút, client chờ đến timeout (ví dụ minh họa, project chưa có endpoint này).
+**Khái niệm:**Dùng method bất đồng bộ khi API chạy quá lâu: server trả ngay 202 (đã nhận), làm ngầm, client hỏi lại qua link Location để biết xong chưa.
 
-**Cách làm:** server nhận việc, trả ngay `202 Accepted` (đã nhận, chưa xong) kèm link hỏi tiến độ:
-```http
-HTTP/1.1 202 Accepted
-Location: /api/status/12345
-```
-Client gọi `GET /api/status/12345` định kỳ (polling) và nhận:
-```json
-{"status":"In progress", "link": {"rel":"cancel","method":"delete","href":"/api/status/12345"}}
-```
-Khi xong, nếu việc đó tạo resource mới thì endpoint status trả `303 See Other` kèm `Location: /api/courses/12345` trỏ tới resource đó.
+**`Location` là gì:** header của response chứa một URL, bảo client "đi tới đây". Ở `202` nó trỏ tới nơi hỏi tiến độ (`/api/status/12345`), ở `303` nó trỏ tới kết quả (`/api/courses/12345`).
+
+**Trong project:** project chưa có endpoint này (chưa có việc nào chạy lâu cần dùng).
 - Real case: [real_cases.md, Case 4](real_cases.md#case-4)
 
 ### 5. Implement data pagination and filtering
+**Khái niệm:** không trả cả danh sách lớn một lần. Dùng query string để lấy đúng phần cần: `limit/offset` để phân trang (có mặc định và giới hạn tối đa chống DoS), filter để lọc, `fields` để chỉ lấy các field cần. Request có query string thường không cache vì ít người gọi giống nhau.
+
 **Vấn đề:** `GET /users` có 1 triệu người dùng, trả hết một lần thì chậm, tốn băng thông, có thể sập server.
 
 Dùng query string để client chỉ lấy phần cần:
-- **Pagination:** `GET /users?limit=25&offset=50` (lấy 25 người dùng, bỏ qua 50 người đầu). Đặt giá trị mặc định (`limit=25`, `offset=0`) và **giới hạn tối đa** để chống tấn công DoS: client xin `limit=1000` mà max là 25 thì trả 25 người dùng hoặc báo `400`.
-- **Filtering:** `GET /courses?status=OPEN&teacherId=t1`.
-- **Sorting:** `GET /courses?sort=name`. Lưu ý: query string là một phần của cache key nên sort/filter đa dạng làm cache kém hiệu quả.
-- **Field selection:** `GET /courses?fields=id,name` (chỉ trả hai field này). Server phải kiểm tra field nào được phép, tránh lộ field nội bộ.
+- **Pagination:** chỉ lấy một lượng dữ liệu nhất định mỗi lần, chia thành trang. `GET /users?limit=25&offset=50` (lấy 25 người dùng, bỏ qua 50 người đầu). Đặt mặc định (`limit=25`, `offset=0`) và **giới hạn tối đa** để chống DoS: client xin `limit=1000` mà max là 25 thì trả 25 hoặc báo `400`.
+- **Filtering:** lọc để chỉ lấy các bản ghi cần. `GET /courses?status=OPEN&teacherId=t1`.
+- **Sorting:** `GET /courses?sort=name`.
+- **Lưu ý cache:** request có query string (filter, sort) thường **không cache**, vì ít người gọi giống nhau, cache lại tốn chỗ mà không tăng hiệu suất bao nhiêu. Chỉ cache `GET /courses` thuần.
+- **Field selection:** chỉ lấy những field (column) cần thiết. `GET /courses?fields=id,name` (chỉ trả hai field này). Server phải kiểm tra field nào được phép, tránh lộ field nội bộ.
 - Real case: [real_cases.md, Case 5](real_cases.md#case-5)
 
 ### 6. Support partial responses
-**Vấn đề:** tải file tài liệu PDF của khóa học 4 MB trên mạng chập chờn, đứt là phải tải lại từ đầu.
+**Khái niệm:** với file lớn, cho client tải từng đoạn bằng header `Range`, server trả `206 Partial Content`. Mạng đứt thì tải tiếp phần còn lại, không phải tải lại từ đầu.
 
-**Cách làm:** cho phép tải từng đoạn.
-1. Client gửi `HEAD /courses/10/materials/5` (chỉ lấy header, không lấy body). Server trả `Accept-Ranges: bytes` (hỗ trợ tải từng đoạn) và `Content-Length: 4580` (tổng kích thước).
-2. Client gửi `GET` kèm `Range: bytes=0-2499` (xin 2500 byte đầu).
+**Vấn đề:** tải file PDF của khóa học 4 MB trên mạng chập chờn, đứt là phải tải lại từ đầu. Tải từng đoạn thì đứt chỉ cần tải tiếp phần còn lại.
+
+**Cách làm:**
+1. `HEAD /courses/10/materials/5` (chỉ lấy header). Server trả `Accept-Ranges: bytes` (hỗ trợ tải từng đoạn) và `Content-Length: 4580` (tổng kích thước).
+2. `GET` kèm `Range: bytes=0-2499` (xin 2500 byte đầu).
 3. Server trả `206 Partial Content` kèm `Content-Range: bytes 0-2499/4580`. Request tiếp theo xin phần còn lại.
 - Real case: [real_cases.md, Case 6](real_cases.md#case-6)
 
 ### 7. Implement HATEOAS
-**Vấn đề:** client phải tự ghép URL (`"/teachers/" + course.teacherId`), server đổi URL là client hỏng.
+**Khái niệm:** HATEOAS (Hypertext as the Engine of Application State) là response kèm sẵn link tới resource liên quan và thao tác có thể làm tiếp, để client đi theo link thay vì tự ghép URL. Server đổi URL thì client không hỏng.
 
-**Là gì:** HATEOAS (Hypertext as the Engine of Application State) là response kèm sẵn link tới resource liên quan và thao tác có thể làm tiếp. Client đi theo link, không cần tự ghép URL.
+**Vấn đề:** client tự ghép URL (`"/teachers/" + course.teacherId`) thì server đổi URL là client hỏng.
 
 ```json
 {
@@ -153,9 +150,11 @@ Dùng query string để client chỉ lấy phần cần:
 - Real case: [real_cases.md, Case 7](real_cases.md#case-7)
 
 ### 8. Implement versioning
-**Vấn đề:** cần đổi `teacher` trong response khóa học từ một chuỗi tên thành object `{id, name}`. Đổi thẳng thì app cũ (người dùng chưa update) bị lỗi.
+**Khái niệm:** khi sửa response theo kiểu làm client cũ hỏng (đổi tên, xóa field, đổi cấu trúc) thì không sửa bản cũ mà **thêm một version mới**. Bản cũ vẫn chạy cho client cũ, client sửa xong thì chuyển sang gọi bản mới.
 
-**No versioning:** cách đơn giản nhất, hợp API nội bộ. Thêm field mới thì client cũ bỏ qua field lạ nên không sao. Nhưng đổi tên, xóa field, đổi cấu trúc là **breaking change**, cần một trong 4 cách dưới đây để giữ song song bản cũ và bản mới:
+**Vấn đề:** cần đổi `teacher` trong response khóa học từ chuỗi tên thành object `{id, name}`. Đổi thẳng thì app cũ (người dùng chưa update) bị lỗi.
+
+**Khi nào không cần versioning:** thêm field mới thì client cũ bỏ qua field lạ nên không sao. API nội bộ (FE và BE cùng deploy một lúc) cũng thường không cần. Chỉ khi đổi hoặc xóa cái đã có mới cần version mới, và có 4 cách để đánh version:
 
 | Cách | Ví dụ | Ghi nhớ |
 | --- | --- | --- |
@@ -164,26 +163,29 @@ Dùng query string để client chỉ lấy phần cần:
 | Header versioning | `Custom-Header: api-version=2` | URL sạch, nhưng client phải nhớ gửi header |
 | Media type versioning | `Accept: application/vnd.center.v2+json` | Hợp HATEOAS, phức tạp nhất. Không khớp thì trả `406` |
 
-Cache (lưu sẵn response để khỏi tính lại) hoạt động dễ nhất với URI và query string vì mỗi version có URL riêng. Header và media type phải xét thêm header khi cache.
+Về cache: URI và query string dễ cache vì mỗi version có URL riêng. Header và media type phải xét thêm header khi cache.
 - Real case: [real_cases.md, Case 8](real_cases.md#case-8)
 
 ### 9. Multitenant web APIs
-**Vấn đề:** một API phục vụ nhiều trung tâm (tenant). Server phải biết request của trung tâm nào để không trả nhầm dữ liệu.
+**Khái niệm:** một API phục vụ nhiều khách hàng (tenant) thì mỗi request phải báo cho server biết mình thuộc tenant nào (qua subdomain, header/JWT, hoặc đường dẫn URI), để server chỉ trả dữ liệu của tenant đó.
 
-**3 cách xác định tenant:**
-- **Subdomain/domain:** `https://center1.api.example.com/courses/3`. Mỗi tenant một domain, cần cấu hình DNS.
-- **Header hoặc JWT:** `X-Tenant-ID: center1` hoặc claim `tenant-id` trong token. URL sạch, nhưng cần gateway đọc header. Cache phải phân biệt theo header, nếu không có thể trả dữ liệu trung tâm này cho trung tâm khác.
-- **URI path:** `GET /tenants/center1/courses/3`. Dễ hiểu nhưng API kém RESTful hơn, routing phức tạp hơn.
-- Real case: [real_cases.md, Case 9](real_cases.md#case-9)
-
+**Vấn đề:** một API phục vụ nhiều trung tâm. Server phải biết request của trung tâm nào để không trả nhầm dữ liệu.
 ### 10. Enable distributed tracing and trace context in APIs
-**Vấn đề:** một request đi qua nhiều service, lỗi xảy ra mà không biết ở service nào.
+**Khái niệm:** gắn một mã vào request, mỗi service đi qua ghi mã đó vào log, để biết request đã đi qua những service nào và lỗi ở đâu. Chỉ phục vụ truy vết, không làm API nhanh hơn.
 
-**Cách làm:** client gắn một mã vào header, ví dụ `Correlation-ID: aaaa0000-bb11-...`. Mỗi service đi qua đều ghi mã đó vào log và trả lại trong response. Khi có lỗi, tìm log theo mã là thấy toàn bộ đường đi của request. Các tên header thường gặp: `Correlation-ID`, `X-Request-ID`, `X-Trace-ID`.
+**Vấn đề:** một request đi qua nhiều service, mỗi service có hàng nghìn dòng log của nhiều người dùng. Có lỗi thì không biết dòng log nào thuộc về request đó.
+
+**Cách làm:**
+1. Gắn mã vào header của request, ví dụ `Correlation-ID: aaaa0000-bb11-...` (client không gửi thì server tự sinh).
+2. Mỗi service **truyền mã sang service kế tiếp** và ghi mã vào log. Không truyền thì mỗi service có mã riêng, không nối lại được.
+3. **Trả mã lại trong response**, để người dùng báo lỗi kèm mã.
+4. Có lỗi thì tìm log theo mã là thấy cả đường đi.
+
+Tên header hay gặp: `Correlation-ID`, `X-Request-ID`, `X-Trace-ID`.
 - Real case: [real_cases.md, Case 10](real_cases.md#case-10)
 
 ### 11. Web API maturity model
-Richardson Maturity Model (2008) là thang đo "mức độ REST" của một API:
+**Khái niệm:** Richardson Maturity Model (2008) là thang 4 mức (0 đến 3) đo "mức độ REST" của một API. Đa số API thực tế dừng ở Level 2.
 - **Level 0:** một URI duy nhất, mọi thao tác là POST (kiểu SOAP).
 - **Level 1:** mỗi resource có URI riêng.
 - **Level 2:** dùng đúng HTTP method để thao tác resource. Đa số API thực tế dừng ở đây.
@@ -191,6 +193,8 @@ Richardson Maturity Model (2008) là thang đo "mức độ REST" của một AP
 - Real case: [real_cases.md, Case 11](real_cases.md#case-11)
 
 ### 12. OpenAPI Initiative
+**Khái niệm:** OpenAPI (trước là Swagger) là chuẩn file mô tả toàn bộ API (endpoint, tham số, response). Nên thiết kế file này trước (contract-first) rồi mới viết code, và từ đó sinh được tài liệu và client library.
+
 - **OpenAPI** (trước là Swagger) là chuẩn file mô tả toàn bộ API: endpoint, tham số, response.
 - Khuyến khích **contract-first**: thiết kế file mô tả (contract) trước rồi mới viết code, thay vì code xong mới mô tả.
 - Từ file contract có thể sinh tài liệu và client library.
