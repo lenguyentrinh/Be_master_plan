@@ -4,36 +4,57 @@
 - **Week:** Week 5-6
 
 ## Mục lục
-- [Reference](#reference)
-- [Key concepts](#key-concepts)
-  - [Design pattern là gì](#design-pattern-là-gì)
-  - [1. Singleton](#1-singleton)
-  - [2. Factory Method](#2-factory-method)
-  - [3. Strategy](#3-strategy)
-  - [4. Observer](#4-observer)
-  - [5. Builder](#5-builder)
-  - [6. Adapter](#6-adapter)
-  - [7. State](#7-state)
-  - [Tổng hợp](#tổng-hợp)
-- [Q&A](#qa)
-- [Hands-on](#hands-on)
-- [Done](#done)
-- [Slide](#slide)
+- [Algorithm](#algorithm)
+  - [Mục lục](#mục-lục)
+  - [Reference](#reference)
+  - [Key concepts](#key-concepts)
+    - [Design pattern là gì](#design-pattern-là-gì)
+    - [1. Singleton](#1-singleton)
+    - [2. Factory Method](#2-factory-method)
+    - [3. Strategy](#3-strategy)
+    - [4. Observer](#4-observer)
+    - [5. Builder](#5-builder)
+    - [6. Adapter](#6-adapter)
+    - [7. State](#7-state)
+    - [Tổng hợp](#tổng-hợp)
+  - [Q\&A](#qa)
+  - [Hands-on](#hands-on)
+  - [Done](#done)
+  - [Slide](#slide)
 
 ## Reference
 - [The 7 most important software design patterns](https://www.educative.io/blog/the-7-most-important-software-design-patterns)
 
 ## Key concepts
 
-Các ví dụ dùng app giao đồ ăn (order, thanh toán, giao hàng). Code là Java rút gọn (bỏ import, getter, constructor phụ), chỉ để thấy ý tưởng.
+Các ví dụ lấy từ project `english-center-system-clean` (trung tâm tiếng Anh: khóa học, ghi danh, giáo viên, mail OTP). Code là Java rút gọn (bỏ import, getter, constructor phụ), chỉ để thấy ý tưởng. Chỗ nào project chưa có thì ghi rõ là đề xuất. Chi tiết từng case xem [real_cases.md](real_cases.md).
 
 ### Design pattern là gì
-- Là cách giải quyết đã được nhiều người dùng cho một loại vấn đề hay gặp khi viết code (giống công thức nấu ăn: không phải code copy được, mà là cách tổ chức code).
+- Là những mẫu thiết kế có sẵn để giải quyết những vấn đề chúng ta hay gặp.
+
+Cách học design pattern:
+- Xem context, UML, code example
+- Phải nhớ pattern giải quyết vấn đề gì
+- Học và tìm hiểu pattern trong framework
+- Áp dụng vào thực tế
+
 - Lợi ích: team nói "dùng Strategy" là ai cũng hiểu ngay, khỏi giải thích dài.
 - Lưu ý: không có vấn đề thật mà vẫn dùng pattern thì code chỉ rối thêm.
 
 ### 1. Singleton
-- **Vấn đề:** có những thứ cả app chỉ nên có một bản. Nếu mỗi nơi tự tạo bản riêng thì tốn tài nguyên, và các bản có thể lệch nhau.
+- **Khái niệm:** Singleton pattern là một design pattern mà toàn bộ hệ thống chỉ có một bản. Nếu hệ thống có nhiều bản thì tốn tài nguyên, và các bản có thể khác nhau về giá trị. Ví dụ: config dự án, kết nối với mail service, kết nối đến DB.
+- **Vấn đề:** nếu mỗi nơi trong hệ thống tự tạo kết nối riêng đến mail hay đến DB thì tốn tài nguyên, và không đảm bảo mọi nơi dùng cùng một cấu hình, cùng một trạng thái (ví dụ có bản đã đọc config mới, có bản vẫn giữ config cũ).
+
+```mermaid
+classDiagram
+    class Config {
+        -static instance: Config
+        -Config()
+        +static get() Config
+    }
+    Config --> Config : giữ 1 instance
+```
+
 - **Cách giải:** chỉ tạo đúng 1 object, ai cần thì lấy lại chính object đó.
 ```java
 class Config {
@@ -50,63 +71,88 @@ Config.get() == Config.get(); // true: cùng một object
 ```
 - **Khi dùng:** config, cache, connection pool.
 - **Lưu ý:** dùng nhiều thì thành biến global trá hình, khó test.
-
-- Real case: [real_cases.md, Case 1](real_cases.md#case-1-singleton-config-dùng-chung), [Case 2](real_cases.md#case-2-singleton-connection-pool)
+- **Trong framework:** Spring bean mặc định là singleton (mọi `@Service`/`@Component` chỉ có một bản). JDK: `Runtime.getRuntime()`.
+- 
+- Real case: [real_cases.md, Case 1](real_cases.md#case-1-singleton-mailservice-dùng-chung), [Case 2](real_cases.md#case-2-singleton-một-datasource-cho-cả-app)
 
 ### 2. Factory Method
+- **Khái niệm:** Factory Method là một design pattern: thay vì viết `if/else` rồi chọn đối tượng ở nhiều nơi, ta tạo một class có một hàm chung làm việc đó. Nơi nào cần thì gọi hàm này và truyền giá trị phù hợp để nhận về đối tượng tương ứng (có thể là `new` mới, hoặc bean có sẵn do Spring quản lý). Khi thêm, xóa hoặc sửa một loại thì chỉ sửa ở một chỗ, không phải sửa nhiều nơi.
 - **Vấn đề:** code phải tạo object thuộc nhiều loại tùy điều kiện. Nếu chỗ nào cũng tự `if/else` rồi `new` thì thêm loại mới phải sửa khắp nơi.
-- **Cách giải:** gom việc "chọn và tạo object" vào một hàm. Chỗ khác chỉ gọi hàm đó, không cần biết class cụ thể.
-```java
-interface Payment { void pay(Order order); }
-class PayPal implements Payment { public void pay(Order o) { /* gọi PayPal */ } }
-class CreditCard implements Payment { public void pay(Order o) { /* gọi cổng thẻ */ } }
 
-class PaymentFactory {
-    static Payment create(String method) {
-        return switch (method) {
-            case "paypal" -> new PayPal();
-            case "card"   -> new CreditCard();
-            default -> throw new IllegalArgumentException("Unknown: " + method);
-        };
-    }
-}
-
-PaymentFactory.create(request.getMethod()).pay(order); // thêm loại mới chỉ sửa trong factory
+```mermaid
+classDiagram
+    class OtpSender { <<interface>> +send(purpose, user, otp) }
+    class EmailOtpSender
+    class SmsOtpSender
+    class OtpSenderFactory { +create(channel) OtpSender }
+    OtpSender <|.. EmailOtpSender
+    OtpSender <|.. SmsOtpSender
+    OtpSenderFactory ..> OtpSender : tạo
 ```
 
-- Real case: [real_cases.md, Case 3](real_cases.md#case-3-factory-method-chọn-cổng-thanh-toán), [Case 4](real_cases.md#case-4-factory-method-chọn-kênh-thông-báo)
+- **Cách giải:** gom việc "chọn và tạo object" vào một hàm. Chỗ khác chỉ gọi hàm đó, không cần biết class cụ thể.
+- 
+- Real case: [real_cases.md, Case 3](real_cases.md#case-3-factory-method-chọn-kênh-gửi-otp), [Case 4](real_cases.md#case-4-factory-method-hmac-của-jdk)
 
 ### 3. Strategy
 - **Vấn đề:** cùng một việc nhưng có nhiều cách làm. Nhét hết vào một hàm toàn `if/else` thì thêm cách mới phải sửa hàm cũ, dễ làm hỏng nhánh đang chạy.
+
+```mermaid
+classDiagram
+    class MailStrategy { <<interface>> +ctaUrl(appUrl, email) String }
+    class VerifyEmailMail
+    class ResetPasswordMail
+    class AccountInviteMail
+    MailStrategy <|.. VerifyEmailMail
+    MailStrategy <|.. ResetPasswordMail
+    MailStrategy <|.. AccountInviteMail
+    MailService --> MailStrategy : dùng
+```
+
 - **Cách giải:** mỗi cách tính là một hàm riêng, cùng dạng đầu vào/đầu ra, rồi chọn cái cần dùng lúc chạy.
 ```java
-interface PricingStrategy { int fee(Order order); }
-class StandardPricing implements PricingStrategy { public int fee(Order o) { return 15000; } }
-class ExpressPricing  implements PricingStrategy { public int fee(Order o) { return 30000; } }
-class PeakPricing     implements PricingStrategy { public int fee(Order o) { return 20000; } }
+interface MailStrategy { String ctaUrl(String appUrl, String email); }
+class VerifyEmailMail   implements MailStrategy { public String ctaUrl(String u, String e) { return u + "/auth/verify-email?email=" + e; } }
+class ResetPasswordMail implements MailStrategy { public String ctaUrl(String u, String e) { return u + "/auth/forgot-password"; } }
+class AccountInviteMail implements MailStrategy { public String ctaUrl(String u, String e) { return u + "/auth/forgot-password?email=" + e; } }
 
-Map<String, PricingStrategy> pricing = Map.of(
-    "standard", new StandardPricing(),
-    "express",  new ExpressPricing(),
-    "peak",     new PeakPricing());
+Map<Kind, MailStrategy> mails = Map.of(
+    Kind.VERIFY_EMAIL,   new VerifyEmailMail(),
+    Kind.RESET_PASSWORD, new ResetPasswordMail(),
+    Kind.ACCOUNT_INVITE, new AccountInviteMail());
 
-int fee = pricing.get(request.getType()).fee(order); // thêm cách tính mới: thêm 1 class + 1 dòng trong map
+String url = mails.get(kind).ctaUrl(appUrl, email); // thêm loại mail mới: thêm 1 class + 1 dòng trong map
 ```
 - **Phân biệt với Factory:** Factory chọn "tạo object nào", Strategy chọn "làm theo cách nào".
+- **Trong framework:** `Comparator` truyền vào `list.sort(...)`. Spring Security: `PasswordEncoder` (BCrypt, Argon2... cùng interface).
+- **Trong project:** chưa có.
+- **Có thể áp dụng trong project (đề xuất, project chưa có):**
+  - `MailService.java:57-71` có 3 method gửi mail (`RESET_PASSWORD`, `ACCOUNT_INVITE`, `VERIFY_EMAIL`), và `render` (dòng 77-81) dùng `switch (kind)` để chọn link nút bấm. Mỗi loại mail có thể là một strategy (nội dung + link riêng), thêm loại mail mới chỉ thêm một class.
+  - `EnrollmentServiceImpl.java:130-132` có 3 luật xét điều kiện ghi danh (`ageEligible`, `entryLevelEligible`, `prerequisitesEligible`). Có thể coi mỗi luật là một strategy cùng interface.
 
-- Real case: [real_cases.md, Case 5](real_cases.md#case-5-strategy-tính-phí-ship), [Case 6](real_cases.md#case-6-strategy-khuyến-mãi)
+- Real case: [real_cases.md, Case 5](real_cases.md#case-5-strategy-các-loại-mail-otp), [Case 6](real_cases.md#case-6-strategy-luật-xét-điều-kiện-ghi-danh)
 
 ### 4. Observer
 - **Vấn đề:** khi một object thay đổi, nhiều nơi khác cần biết. Nếu object đó gọi thẳng từng nơi thì thêm nơi mới phải sửa object đó, và nó bị dính chặt vào các nơi kia.
-- **Cách giải:** các bên "đăng ký" lắng nghe. Order đổi trạng thái thì chỉ việc phát tín hiệu, ai đã đăng ký sẽ tự chạy.
-```java
-interface OrderListener { void onStatusChanged(Order order); }
 
-class Order {
-    private final List<OrderListener> listeners = new ArrayList<>();
+```mermaid
+classDiagram
+    class Enrollment { -listeners +addListener(l) +setStatus(s) }
+    class EnrollmentListener { <<interface>> +onStatusChanged(enrollment) }
+    Enrollment o-- EnrollmentListener : thông báo
+    EnrollmentListener <|.. NotifyStudent
+    EnrollmentListener <|.. NotifyTeacher
+```
+
+- **Cách giải:** các bên "đăng ký" lắng nghe. Enrollment đổi trạng thái thì chỉ việc phát tín hiệu, ai đã đăng ký sẽ tự chạy.
+```java
+interface EnrollmentListener { void onStatusChanged(Enrollment enrollment); }
+
+class Enrollment {
+    private final List<EnrollmentListener> listeners = new ArrayList<>();
     private String status;
 
-    void addListener(OrderListener l) { listeners.add(l); }
+    void addListener(EnrollmentListener l) { listeners.add(l); }
 
     void setStatus(String status) {
         this.status = status;
@@ -114,102 +160,147 @@ class Order {
     }
 }
 
-order.addListener(o -> notifyCustomer(o));
-order.addListener(o -> notifyDriver(o));
-order.setStatus("READY"); // cả hai listener tự chạy, Order không biết chúng làm gì
+enrollment.addListener(e -> notifyStudent(e));
+enrollment.addListener(e -> notifyTeacher(e));
+enrollment.setStatus("CANCELLED"); // cả hai listener tự chạy, Enrollment không biết chúng làm gì
 ```
 - **Giống:** follow một người trên Twitter, có bài mới thì tự nhận thông báo.
+- **Trong framework:** Spring `ApplicationEventPublisher.publishEvent(...)` và `@EventListener`.
+- **Trong project:** chưa có (không có `@EventListener` hay `publishEvent`).
+- **Có thể áp dụng trong project (đề xuất, project chưa có):** `EmailVerificationServiceImpl.java:76` và `PasswordResetServiceImpl.java:98` gọi `otpSenders.create(OtpChannel.EMAIL).send(...)` sau khi tạo OTP. Có thể phát một event (ví dụ `OtpIssued`) và để mail là một listener. Sau này ghi log audit chỉ thêm listener, không sửa hai service này. Tương tự `AuthServiceImpl.java:146-148`: sau khi lưu user, hàm đăng ký gọi tuần tự `roleProfileService.onAssigned` và `emailVerificationService.sendCode`, có thể đổi thành event `UserRegistered`.
 
-- Real case: [real_cases.md, Case 7](real_cases.md#case-7-observer-order-đổi-trạng-thái), [Case 8](real_cases.md#case-8-observer-user-đăng-ký)
+- Real case: [real_cases.md, Case 7](real_cases.md#case-7-observer-gửi-mail-sau-khi-tạo-otp), [Case 8](real_cases.md#case-8-observer-user-đăng-ký)
 
 ### 5. Builder
 - **Vấn đề:** object có nhiều thông tin, trong đó nhiều cái tùy chọn. Constructor dài rất khó đọc, dễ nhầm thứ tự tham số.
+
+```mermaid
+classDiagram
+    class Enrollment
+    class EnrollmentBuilder { +enrollDate() +status() +ageEligible() +build() Enrollment }
+    EnrollmentBuilder ..> Enrollment : tạo
+```
+
 - **Cách giải:** dựng object từng bước, mỗi bước có tên rõ ràng, cuối cùng gọi `build()`.
 ```java
-class Order {
-    private final User user;
-    private final List<String> items;
-    private final String coupon, note;
+class Enrollment {
+    private final Student student;
+    private final Course course;
+    private final LocalDate enrollDate;
+    private final String status;
+    private final Boolean ageEligible;
 
-    private Order(Builder b) { user = b.user; items = b.items; coupon = b.coupon; note = b.note; }
+    private Enrollment(Builder b) {
+        student = b.student; course = b.course; enrollDate = b.enrollDate;
+        status = b.status; ageEligible = b.ageEligible;
+    }
 
     static class Builder {
-        private final User user;
-        private final List<String> items = new ArrayList<>();
-        private String coupon, note;
+        private final Student student;
+        private final Course course;
+        private LocalDate enrollDate = LocalDate.now();
+        private String status = "ACTIVE";
+        private Boolean ageEligible;
 
-        Builder(User user) { this.user = user; }
-        Builder addItem(String item)  { items.add(item); return this; }
-        Builder applyCoupon(String c) { coupon = c; return this; }
-        Builder note(String n)        { note = n; return this; }
+        Builder(Student student, Course course) { this.student = student; this.course = course; }
+        Builder enrollDate(LocalDate d)  { enrollDate = d; return this; }
+        Builder status(String s)         { status = s; return this; }
+        Builder ageEligible(Boolean b)   { ageEligible = b; return this; }
 
-        Order build() {
-            if (items.isEmpty()) throw new IllegalStateException("Order has no items"); // kiểm tra field bắt buộc
-            return new Order(this);
+        Enrollment build() {
+            if (student == null || course == null) throw new IllegalStateException("Enrollment needs student and course"); // field bắt buộc
+            return new Enrollment(this);
         }
     }
 }
 
-Order order = new Order.Builder(user)
-    .addItem("burger")
-    .addItem("fries")
-    .applyCoupon("SALE10")
-    .note("no onion")
+Enrollment enrollment = new Enrollment.Builder(student, course)
+    .enrollDate(LocalDate.now())
+    .status("ACTIVE")
+    .ageEligible(true)
     .build();
 ```
+- **Trong framework:** `StringBuilder`, `HttpRequest.newBuilder()`, Lombok `@Builder`.
+- **Trong project:** có, dùng Lombok `@Builder` (Lombok sinh sẵn, không tự viết như trên): `shared/exception/ErrorResponse.java:11`, dùng ở `GlobalExceptionHandler.java:30`; `modules/auth/entity/RefreshToken.java:20`, dùng ở `RefreshTokenServiceImpl.java:54`.
+- **Đã áp dụng trong project:** `EnrollmentServiceImpl.java:125-134` dựng `Enrollment` bằng `Enrollment.builder()` với 8 field (`course`, `student`, `enrollDate`, `status`, 3 cờ `*Eligible`, `eligibilityCheckDate`). `Enrollment` có `@AllArgsConstructor` 9 tham số, nếu dùng constructor thì phải nhớ đúng thứ tự, trong khi ba cờ `Boolean` đứng liền nhau rất dễ đổi nhầm. Cũng có ở `RoleProfileService.java:36,42` (`Teacher.builder().user(user).build()`).
 
-- Real case: [real_cases.md, Case 9](real_cases.md#case-9-builder-tạo-order), [Case 10](real_cases.md#case-10-builder-httprequest-của-jdk)
+- Real case: [real_cases.md, Case 9](real_cases.md#case-9-builder-tạo-enrollment), [Case 10](real_cases.md#case-10-builder-errorresponse)
 
 ### 6. Adapter
 - **Vấn đề:** thư viện hoặc hệ thống bên ngoài có cách gọi khác với cách code mình mong muốn. Gọi trực tiếp ở khắp nơi thì khi đổi bên ngoài phải sửa khắp nơi.
+
+```mermaid
+classDiagram
+    class EmailGateway { <<interface>> +send(to, subject, html) }
+    class JavaMailAdapter
+    class SendGridAdapter
+    EmailGateway <|.. JavaMailAdapter
+    EmailGateway <|.. SendGridAdapter
+    JavaMailAdapter --> JavaMailSender : bọc
+    SendGridAdapter --> SendGridClient : bọc
+```
+
 - **Cách giải:** viết lớp "đầu chuyển" cho mỗi thư viện, cùng một cách gọi. App chỉ gọi đầu chuyển, đổi vendor chỉ đổi đầu chuyển.
 ```java
-interface MapService { double distance(String from, String to); } // cách gọi mà app mong muốn
+interface EmailGateway { void send(String to, String subject, String html); } // cách gọi mà app mong muốn
 
-class GoogleMapsAdapter implements MapService {
-    private final GoogleMapsClient client;   // thư viện bên ngoài, cách gọi riêng
-    GoogleMapsAdapter(GoogleMapsClient c) { client = c; }
-    public double distance(String a, String b) { return client.getDistanceMatrix(a, b).meters(); }
+class JavaMailAdapter implements EmailGateway {
+    private final JavaMailSender sender;     // thư viện bên ngoài, cách gọi riêng
+    JavaMailAdapter(JavaMailSender s) { sender = s; }
+    public void send(String to, String subject, String html) { /* createMimeMessage, setTo, setText, sender.send */ }
 }
 
-class MapboxAdapter implements MapService {
-    private final MapboxClient client;       // thư viện khác, cách gọi khác
-    MapboxAdapter(MapboxClient c) { client = c; }
-    public double distance(String a, String b) { return client.directions(a, b).distance(); }
+class SendGridAdapter implements EmailGateway {
+    private final SendGridClient client;     // thư viện khác, cách gọi khác (tên minh họa)
+    SendGridAdapter(SendGridClient c) { client = c; }
+    public void send(String to, String subject, String html) { client.sendMail(to, subject, html); }
 }
 
-MapService map = new MapboxAdapter(client);  // đổi vendor: chỉ đổi dòng này
-map.distance(shop, home);                    // app luôn gọi một kiểu
+EmailGateway gateway = new SendGridAdapter(client);  // đổi vendor: chỉ đổi dòng này
+gateway.send(email, "Verify your email", html);      // app luôn gọi một kiểu
 ```
 - **Giống:** ổ cắm chuyển đổi khi đi du lịch.
+- **Trong framework:** `Arrays.asList(array)` (đưa mảng về `List`), `InputStreamReader` (đưa byte stream về character stream), Spring MVC `HandlerAdapter`.
+- **Trong project:** chưa có.
+- **Có thể áp dụng trong project (đề xuất, project chưa có):** `MailService.java:85-101` gọi thẳng `JavaMailSender` (`createMimeMessage`, `send`). Nhánh dev không có SMTP (dòng 87-90, chỉ ghi log) thực chất đã là một cách gửi thứ hai. Có thể tạo interface `EmailGateway` với `JavaMailAdapter` và `LogOnlyAdapter`, sau này đổi sang SendGrid hay SES chỉ thêm một adapter, `MailService` không đổi.
 
-- Real case: [real_cases.md, Case 11](real_cases.md#case-11-adapter-đổi-nhà-cung-cấp-bản-đồ), [Case 12](real_cases.md#case-12-adapter-đối-tác-trả-về-xml)
+- Real case: [real_cases.md, Case 11](real_cases.md#case-11-adapter-gửi-mail-qua-javamailsender), [Case 12](real_cases.md#case-12-adapter-gửi-mail-ở-môi-trường-dev)
 
 ### 7. State
 - **Vấn đề:** hành vi của object phụ thuộc trạng thái hiện tại, có thao tác chỉ hợp lệ ở một số trạng thái. Kiểm tra bằng `if` rải khắp nơi thì dễ sót và cho phép thao tác sai.
+
+```mermaid
+stateDiagram-v2
+    [*] --> OPEN
+    OPEN --> ACTIVE
+    OPEN --> CLOSE
+    ACTIVE --> CLOSE
+```
+
 - **Cách giải:** quy định rõ mỗi trạng thái được chuyển sang trạng thái nào, và hành vi nằm ở trạng thái đó.
 ```java
-enum OrderStatus {
-    PLACED, PREPARING, READY, DELIVERING, DELIVERED, CANCELED;
+enum CourseStatus {
+    OPEN, ACTIVE, CLOSE;
 
-    boolean canMoveTo(OrderStatus target) {
+    boolean canMoveTo(CourseStatus target) {       // luật chuyển là giả định minh họa
         return switch (this) {
-            case PLACED     -> target == PREPARING || target == CANCELED; // còn hủy được
-            case PREPARING  -> target == READY;
-            case READY      -> target == DELIVERING;
-            case DELIVERING -> target == DELIVERED;
-            default         -> false;                                     // DELIVERED, CANCELED: kết thúc
+            case OPEN   -> target == ACTIVE || target == CLOSE;
+            case ACTIVE -> target == CLOSE;
+            case CLOSE  -> false;                  // kết thúc
         };
     }
 }
 
-if (!order.getStatus().canMoveTo(target)) {
-    throw new IllegalStateException(order.getStatus() + " -> " + target + " is not allowed");
+if (!course.getStatus().canMoveTo(target)) {
+    throw new IllegalStateException(course.getStatus() + " -> " + target + " is not allowed");
 }
 ```
 - **Lưu ý:** đây là bản rút gọn dùng `enum`. Bản đầy đủ của pattern là mỗi trạng thái một class riêng, mỗi class tự xử lý hành vi của trạng thái đó.
+- **Trong framework:** thư viện Spring Statemachine (JDK không có sẵn).
+- **Trong project:** chưa có State đúng nghĩa. `shared/enums/CourseStatus.java` (`OPEN/CLOSE/ACTIVE`) và `UserStatus.java` mới chỉ là enum có `label`. `CourseServiceImpl.java:161` gán thẳng `course.setStatus(request.status())` mà không kiểm tra luồng chuyển, đây là chỗ có thể áp dụng State.
+- **Có thể áp dụng trong project (đề xuất, project chưa có):** trạng thái ghi danh (`Enrollment.java:28`, `ACTIVE` là chuỗi) được gán ở nhiều nơi: `EnrollmentServiceImpl.java:146` và `RoleProfileService.java:65` đều `setStatus(Enrollment.CANCELLED)`, hiện cả hai chỉ an toàn nhờ câu truy vấn lọc `ACTIVE` trước đó, luật không nằm ở một chỗ gọi tên. Tương tự khóa học: `CourseServiceImpl.java:161` gán `setStatus(request.status())`, còn `EnrollmentServiceImpl.java:92` mới chỉ kiểm tra `== CLOSE`. Thêm `canMoveTo` cho enum trạng thái (như ví dụ trên) thì mọi chỗ đổi trạng thái đều qua một cửa kiểm tra, khi thêm trạng thái mới sẽ không còn chuyển sai kiểu từ `CANCELLED` quay lại `ACTIVE`.
 
-- Real case: [real_cases.md, Case 13](real_cases.md#case-13-state-vòng-đời-order), [Case 14](real_cases.md#case-14-state-thanh-toán-và-hoàn-tiền)
+- Real case: [real_cases.md, Case 13](real_cases.md#case-13-state-trạng-thái-khóa-học), [Case 14](real_cases.md#case-14-state-trạng-thái-ghi-danh)
 
 ### Tổng hợp
 | Pattern | Nhóm | Dùng khi |
