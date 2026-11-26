@@ -193,15 +193,17 @@ Tên header hay gặp: `Correlation-ID`, `X-Request-ID`, `X-Trace-ID`.
 - Real case: [real_cases.md, Case 11](real_cases.md#case-11)
 
 ### 12. OpenAPI Initiative
-**Khái niệm:** OpenAPI (trước là Swagger) là chuẩn file mô tả toàn bộ API của hệ thống (endpoint, tham số, response, lỗi). Bài gốc khuyên viết file này trước (contract-first) rồi mới code, để frontend và backend thống nhất từ đầu. Từ file này sinh được tài liệu, client library, và trang Swagger UI để xem và gọi thử API.
+**Khái niệm:** 
+- OpenAPI = một chuẩn để mô tả API (route nào, gửi gì, trả gì), viết thành file.
+- Swagger UI = trang web đọc file đó, cho bạn xem danh sách API và bấm thử.
 
-- **OpenAPI** (trước là Swagger) là chuẩn file mô tả toàn bộ API: endpoint, tham số, response.
-- Khuyến khích **contract-first**: thiết kế file mô tả (contract) trước rồi mới viết code, thay vì code xong mới mô tả.
-- Từ file contract có thể sinh tài liệu và client library.
-- Real case: [real_cases.md, Case 12](real_cases.md#case-12)
-
+Trong project của bạn không có file YAML/JSON nằm sẵn trên đĩa. Khi backend chạy, springdoc quét các controller (@RestController, @GetMapping,...) rồi tự sinh file này. Đây là
+code-first.
+Luồng hoạt động:
+1. Backend chạy: springdoc quét controller và sinh 350N tal/v3/api-docs.
+2. Trang /swagger-ui.html (application.yml:87) tài 350N đó.
+3. Swagger UI hiển thị danh sách API, và bạn bấm "Try it out" để gọi thử.
 ## Q&A
-- 
 - Câu hỏi ôn tập kèm đáp án: [questions.md](questions.md)
 
 ## Hands-on
