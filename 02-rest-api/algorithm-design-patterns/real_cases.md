@@ -102,9 +102,9 @@ return HexFormat.of().formatHex(mac.doFinal(data));
 ## Strategy
 
 ### Case 5. Strategy, các loại mail OTP
-**Tình huống (code hiện tại):** `MailService.java` có 3 method gửi mail: `sendPasswordResetOtp` (dòng 58), `sendAccountInviteOtp` (dòng 63), `sendEmailVerificationOtp` (dòng 68). Method `render` (dòng 74-83) dùng `switch (kind)` để chọn link nút bấm (dòng 77-81).
+> **Kết luận:** chưa hợp, giữ `switch`.
 
-**Vấn đề:** thêm một loại mail mới phải thêm giá trị `Kind`, một method, và một `case` trong `switch`.
+**Tình huống (code hiện tại):** `modules/auth/service/MailService.java:77-81`, `render` dùng `switch (kind)` 3 case để chọn link nút bấm.
 ```java
 String ctaUrl = switch (kind) {
     case VERIFY_EMAIL   -> appUrl + "/auth/verify-email?email=" + email;
@@ -113,41 +113,16 @@ String ctaUrl = switch (kind) {
 };
 ```
 
-**Cách giải (đề xuất):** mỗi loại mail là một strategy, cùng interface.
-```java
-interface MailStrategy {
-    String codeLine();                           // "Mã xác nhận email của bạn là: %s"
-    String ctaUrl(String appUrl, String email);  // link nút bấm
-}
-Map<Kind, MailStrategy> mails = Map.of(
-    Kind.VERIFY_EMAIL, new VerifyEmailMail(),
-    Kind.RESET_PASSWORD, new ResetPasswordMail(),
-    Kind.ACCOUNT_INVITE, new AccountInviteMail());
+**Vì sao chưa cần:** 3 loại mail chỉ khác dữ liệu (một câu, một link) và số loại cố định. Tách thành strategy chỉ thêm file và khó đọc hơn (đã thử rồi bỏ).
 
-String ctaUrl = mails.get(kind).ctaUrl(appUrl, email);
-```
-
-**Nhìn vào đâu:** `render` đã có comment ở dòng 73 "package-private so tests can check it without SMTP", nên test được mà không cần gửi mail. Gọi `render(Kind.VERIFY_EMAIL, ...)` và kiểm tra HTML chứa `/auth/verify-email?email=`. Sau khi tách, mỗi strategy có test riêng, thêm loại mail mới không phải sửa `switch`.
+**Khi nào nên đổi:** `switch` dài, hay thêm case, mỗi case có logic thật (xem lưu ý đầu mục Strategy trong README).
 
 ### Case 6. Strategy, luật xét điều kiện ghi danh
-**Tình huống (code hiện tại):** `modules/academic/service/impl/EnrollmentServiceImpl.java`. Khi ghi danh, project tính 3 cờ (dòng 130-132): `ageEligible`, `entryLevelEligible`, `prerequisitesEligible`. Mỗi cờ là một method `static` riêng (dòng 215-235), cùng dạng `(Course, Student) -> Boolean`, trả `null` khi thiếu dữ liệu (ví dụ dòng 217).
+> **Kết luận:** không phải Strategy.
 
-**Vấn đề:** thêm một luật mới (ví dụ giới hạn nhóm ngành) phải thêm method, thêm dòng trong `builder`, và thêm cột trong `Enrollment`.
+**Tình huống (code hiện tại):** `modules/academic/service/impl/EnrollmentServiceImpl.java:130-132` tính 3 cờ `ageEligible`, `entryLevelEligible`, `prerequisitesEligible` (3 method `static`, dòng 215-235).
 
-**Cách giải (đề xuất):** coi mỗi luật là một strategy cùng interface.
-```java
-interface EligibilityRule {
-    Boolean check(Course course, Student student); // null = chưa đủ dữ liệu để kết luận
-}
-class AgeRule implements EligibilityRule { /* nội dung ageEligible */ }
-class EntryLevelRule implements EligibilityRule { /* nội dung entryLevelEligible */ }
-class PrerequisiteRule implements EligibilityRule { /* nội dung prerequisitesEligible */ }
-
-List<EligibilityRule> rules = List.of(new AgeRule(), new EntryLevelRule(), new PrerequisiteRule());
-```
-Lưu ý: `Enrollment` đang lưu 3 cột riêng cho 3 luật, nên thêm luật vẫn phải thêm cột nếu muốn lưu kết quả. Strategy chỉ giúp gom và test logic từng luật.
-
-**Nhìn vào đâu:** test từng rule riêng. Ví dụ `ageEligible` phải trả `null` khi `course.getMinimumAge()` hoặc `student.getDateOfBirth()` là `null` (dòng 217), trả `true`/`false` khi đủ dữ liệu. Các test này không cần dựng `EnrollmentServiceImpl`.
+**Vì sao:** Strategy là chọn **một** cách trong nhiều cách. Ở đây cả 3 luật đều chạy rồi lưu vào 3 cột riêng, nên giữ nguyên.
 
 ---
 

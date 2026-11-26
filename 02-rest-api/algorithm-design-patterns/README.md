@@ -27,7 +27,7 @@
 
 ## Key concepts
 
-Các ví dụ lấy từ project `english-center-system-clean` (trung tâm tiếng Anh: khóa học, ghi danh, giáo viên, mail OTP). Code là Java rút gọn (bỏ import, getter, constructor phụ), chỉ để thấy ý tưởng. Chỗ nào project chưa có thì ghi rõ là đề xuất. Chi tiết từng case xem [real_cases.md](real_cases.md).
+Các ví dụ lấy từ project `english-center-system-clean`. Code là Java rút gọn, chỉ để thấy ý tưởng. Chỗ nào project chưa có thì ghi là đề xuất. Chi tiết từng case xem [real_cases.md](real_cases.md).
 
 ### Design pattern là gì
 - Là những mẫu thiết kế có sẵn để giải quyết những vấn đề chúng ta hay gặp.
@@ -72,7 +72,7 @@ Config.get() == Config.get(); // true: cùng một object
 - **Khi dùng:** config, cache, connection pool.
 - **Lưu ý:** dùng nhiều thì thành biến global trá hình, khó test.
 - **Trong framework:** Spring bean mặc định là singleton (mọi `@Service`/`@Component` chỉ có một bản). JDK: `Runtime.getRuntime()`.
-- 
+
 - Real case: [real_cases.md, Case 1](real_cases.md#case-1-singleton-mailservice-dùng-chung), [Case 2](real_cases.md#case-2-singleton-một-datasource-cho-cả-app)
 
 ### 2. Factory Method
@@ -91,44 +91,46 @@ classDiagram
 ```
 
 - **Cách giải:** gom việc "chọn và tạo object" vào một hàm. Chỗ khác chỉ gọi hàm đó, không cần biết class cụ thể.
-- 
+- **Trong Spring (collection injection):** inject `Map<String, T>` (key là tên bean) hoặc `List<T>` chứa tất cả bean cùng kiểu, rồi tra theo giá trị thay cho `if/else`. Nếu key là enum thì tự dựng map từ `List<T>`.
 - Real case: [real_cases.md, Case 3](real_cases.md#case-3-factory-method-chọn-kênh-gửi-otp), [Case 4](real_cases.md#case-4-factory-method-hmac-của-jdk)
 
 ### 3. Strategy
+- **Khái niệm:** Strategy dùng khi cùng một công việc nhưng có nhiều cách làm (mục đích giống nhau, cách làm và kết quả khác nhau). Mỗi cách viết thành một class riêng, rồi dựa vào tham số để chọn cách làm tương ứng thay vì `if/else`. 
+
+> **Lưu ý:** chỉ dùng khi `switch`/`if-else` dài, hay thêm nhánh mới, mỗi nhánh có logic thật. Ít nhánh, cố định thì giữ `switch`.
+
 - **Vấn đề:** cùng một việc nhưng có nhiều cách làm. Nhét hết vào một hàm toàn `if/else` thì thêm cách mới phải sửa hàm cũ, dễ làm hỏng nhánh đang chạy.
 
 ```mermaid
 classDiagram
     class MailStrategy { <<interface>> +ctaUrl(appUrl, email) String }
-    class VerifyEmailMail
-    class ResetPasswordMail
-    class AccountInviteMail
-    MailStrategy <|.. VerifyEmailMail
-    MailStrategy <|.. ResetPasswordMail
-    MailStrategy <|.. AccountInviteMail
+    class VerifyEmail
+    class ResetPassword
+    class AccountInvite
+    MailStrategy <|.. VerifyEmail
+    MailStrategy <|.. ResetPassword
+    MailStrategy <|.. AccountInvite
     MailService --> MailStrategy : dùng
 ```
 
 - **Cách giải:** mỗi cách tính là một hàm riêng, cùng dạng đầu vào/đầu ra, rồi chọn cái cần dùng lúc chạy.
 ```java
 interface MailStrategy { String ctaUrl(String appUrl, String email); }
-class VerifyEmailMail   implements MailStrategy { public String ctaUrl(String u, String e) { return u + "/auth/verify-email?email=" + e; } }
-class ResetPasswordMail implements MailStrategy { public String ctaUrl(String u, String e) { return u + "/auth/forgot-password"; } }
-class AccountInviteMail implements MailStrategy { public String ctaUrl(String u, String e) { return u + "/auth/forgot-password?email=" + e; } }
+class VerifyEmail   implements MailStrategy { public String ctaUrl(String u, String e) { return u + "/auth/verify-email?email=" + e; } }
+class ResetPassword implements MailStrategy { public String ctaUrl(String u, String e) { return u + "/auth/forgot-password"; } }
+class AccountInvite implements MailStrategy { public String ctaUrl(String u, String e) { return u + "/auth/forgot-password?email=" + e; } }
 
-Map<Kind, MailStrategy> mails = Map.of(
-    Kind.VERIFY_EMAIL,   new VerifyEmailMail(),
-    Kind.RESET_PASSWORD, new ResetPasswordMail(),
-    Kind.ACCOUNT_INVITE, new AccountInviteMail());
+Map<Kind, MailStrategy> strategies = Map.of(
+    Kind.VERIFY_EMAIL, new VerifyEmail(),
+    Kind.RESET_PASSWORD, new ResetPassword(),
+    Kind.ACCOUNT_INVITE, new AccountInvite());
 
-String url = mails.get(kind).ctaUrl(appUrl, email); // thêm loại mail mới: thêm 1 class + 1 dòng trong map
+String url = strategies.get(kind).ctaUrl(appUrl, email); // thêm loại mail mới: thêm 1 class + 1 dòng trong map
 ```
 - **Phân biệt với Factory:** Factory chọn "tạo object nào", Strategy chọn "làm theo cách nào".
+- **Cách chọn:** thường dùng một `Map` (key là giá trị truyền vào, value là cách làm), hoặc đưa thẳng cách làm vào hàm như `list.sort(comparator)`. Mỗi cách làm có thể chỉ là một hàm (lambda) thay vì class, nếu ngắn và chỉ có một hàm.
 - **Trong framework:** `Comparator` truyền vào `list.sort(...)`. Spring Security: `PasswordEncoder` (BCrypt, Argon2... cùng interface).
-- **Trong project:** chưa có.
-- **Có thể áp dụng trong project (đề xuất, project chưa có):**
-  - `MailService.java:57-71` có 3 method gửi mail (`RESET_PASSWORD`, `ACCOUNT_INVITE`, `VERIFY_EMAIL`), và `render` (dòng 77-81) dùng `switch (kind)` để chọn link nút bấm. Mỗi loại mail có thể là một strategy (nội dung + link riêng), thêm loại mail mới chỉ thêm một class.
-  - `EnrollmentServiceImpl.java:130-132` có 3 luật xét điều kiện ghi danh (`ageEligible`, `entryLevelEligible`, `prerequisitesEligible`). Có thể coi mỗi luật là một strategy cùng interface.
+- **Trong project:** chưa có chỗ hợp lý. `MailService.java:77-81` chỉ có `switch` 3 case và chỉ khác dữ liệu nên giữ `switch`.
 
 - Real case: [real_cases.md, Case 5](real_cases.md#case-5-strategy-các-loại-mail-otp), [Case 6](real_cases.md#case-6-strategy-luật-xét-điều-kiện-ghi-danh)
 
@@ -167,7 +169,7 @@ enrollment.setStatus("CANCELLED"); // cả hai listener tự chạy, Enrollment 
 - **Giống:** follow một người trên Twitter, có bài mới thì tự nhận thông báo.
 - **Trong framework:** Spring `ApplicationEventPublisher.publishEvent(...)` và `@EventListener`.
 - **Trong project:** chưa có (không có `@EventListener` hay `publishEvent`).
-- **Có thể áp dụng trong project (đề xuất, project chưa có):** `EmailVerificationServiceImpl.java:76` và `PasswordResetServiceImpl.java:98` gọi `otpSenders.create(OtpChannel.EMAIL).send(...)` sau khi tạo OTP. Có thể phát một event (ví dụ `OtpIssued`) và để mail là một listener. Sau này ghi log audit chỉ thêm listener, không sửa hai service này. Tương tự `AuthServiceImpl.java:146-148`: sau khi lưu user, hàm đăng ký gọi tuần tự `roleProfileService.onAssigned` và `emailVerificationService.sendCode`, có thể đổi thành event `UserRegistered`.
+- **Có thể áp dụng trong project (đề xuất):** `AuthServiceImpl.java:146-148` sau khi lưu user gọi tuần tự hai việc, có thể phát event `UserRegistered` cho các listener (xem Case 7, 8).
 
 - Real case: [real_cases.md, Case 7](real_cases.md#case-7-observer-gửi-mail-sau-khi-tạo-otp), [Case 8](real_cases.md#case-8-observer-user-đăng-ký)
 
@@ -221,8 +223,7 @@ Enrollment enrollment = new Enrollment.Builder(student, course)
     .build();
 ```
 - **Trong framework:** `StringBuilder`, `HttpRequest.newBuilder()`, Lombok `@Builder`.
-- **Trong project:** có, dùng Lombok `@Builder` (Lombok sinh sẵn, không tự viết như trên): `shared/exception/ErrorResponse.java:11`, dùng ở `GlobalExceptionHandler.java:30`; `modules/auth/entity/RefreshToken.java:20`, dùng ở `RefreshTokenServiceImpl.java:54`.
-- **Đã áp dụng trong project:** `EnrollmentServiceImpl.java:125-134` dựng `Enrollment` bằng `Enrollment.builder()` với 8 field (`course`, `student`, `enrollDate`, `status`, 3 cờ `*Eligible`, `eligibilityCheckDate`). `Enrollment` có `@AllArgsConstructor` 9 tham số, nếu dùng constructor thì phải nhớ đúng thứ tự, trong khi ba cờ `Boolean` đứng liền nhau rất dễ đổi nhầm. Cũng có ở `RoleProfileService.java:36,42` (`Teacher.builder().user(user).build()`).
+- **Trong project:** có, dùng Lombok `@Builder` (Lombok sinh sẵn): `EnrollmentServiceImpl.java:125-134` dựng `Enrollment` bằng `Enrollment.builder()` với 8 field, và `ErrorResponse.java:11`.
 
 - Real case: [real_cases.md, Case 9](real_cases.md#case-9-builder-tạo-enrollment), [Case 10](real_cases.md#case-10-builder-errorresponse)
 
@@ -262,7 +263,7 @@ gateway.send(email, "Verify your email", html);      // app luôn gọi một ki
 - **Giống:** ổ cắm chuyển đổi khi đi du lịch.
 - **Trong framework:** `Arrays.asList(array)` (đưa mảng về `List`), `InputStreamReader` (đưa byte stream về character stream), Spring MVC `HandlerAdapter`.
 - **Trong project:** chưa có.
-- **Có thể áp dụng trong project (đề xuất, project chưa có):** `MailService.java:85-101` gọi thẳng `JavaMailSender` (`createMimeMessage`, `send`). Nhánh dev không có SMTP (dòng 87-90, chỉ ghi log) thực chất đã là một cách gửi thứ hai. Có thể tạo interface `EmailGateway` với `JavaMailAdapter` và `LogOnlyAdapter`, sau này đổi sang SendGrid hay SES chỉ thêm một adapter, `MailService` không đổi.
+- **Có thể áp dụng trong project (đề xuất):** `MailService.java:85-101` gọi thẳng `JavaMailSender`, có thể bọc sau `EmailGateway` để sau này đổi nhà cung cấp mail chỉ thêm một adapter (xem Case 11, 12).
 
 - Real case: [real_cases.md, Case 11](real_cases.md#case-11-adapter-gửi-mail-qua-javamailsender), [Case 12](real_cases.md#case-12-adapter-gửi-mail-ở-môi-trường-dev)
 
@@ -297,8 +298,7 @@ if (!course.getStatus().canMoveTo(target)) {
 ```
 - **Lưu ý:** đây là bản rút gọn dùng `enum`. Bản đầy đủ của pattern là mỗi trạng thái một class riêng, mỗi class tự xử lý hành vi của trạng thái đó.
 - **Trong framework:** thư viện Spring Statemachine (JDK không có sẵn).
-- **Trong project:** chưa có State đúng nghĩa. `shared/enums/CourseStatus.java` (`OPEN/CLOSE/ACTIVE`) và `UserStatus.java` mới chỉ là enum có `label`. `CourseServiceImpl.java:161` gán thẳng `course.setStatus(request.status())` mà không kiểm tra luồng chuyển, đây là chỗ có thể áp dụng State.
-- **Có thể áp dụng trong project (đề xuất, project chưa có):** trạng thái ghi danh (`Enrollment.java:28`, `ACTIVE` là chuỗi) được gán ở nhiều nơi: `EnrollmentServiceImpl.java:146` và `RoleProfileService.java:65` đều `setStatus(Enrollment.CANCELLED)`, hiện cả hai chỉ an toàn nhờ câu truy vấn lọc `ACTIVE` trước đó, luật không nằm ở một chỗ gọi tên. Tương tự khóa học: `CourseServiceImpl.java:161` gán `setStatus(request.status())`, còn `EnrollmentServiceImpl.java:92` mới chỉ kiểm tra `== CLOSE`. Thêm `canMoveTo` cho enum trạng thái (như ví dụ trên) thì mọi chỗ đổi trạng thái đều qua một cửa kiểm tra, khi thêm trạng thái mới sẽ không còn chuyển sai kiểu từ `CANCELLED` quay lại `ACTIVE`.
+- **Trong project:** chưa có State đúng nghĩa. `CourseStatus` (`OPEN/CLOSE/ACTIVE`) mới chỉ là enum, `CourseServiceImpl.java:161` gán thẳng `course.setStatus(request.status())` mà không kiểm tra luồng chuyển, đây là chỗ có thể áp dụng State (xem Case 13, 14).
 
 - Real case: [real_cases.md, Case 13](real_cases.md#case-13-state-trạng-thái-khóa-học), [Case 14](real_cases.md#case-14-state-trạng-thái-ghi-danh)
 
